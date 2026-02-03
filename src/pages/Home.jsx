@@ -6,12 +6,14 @@ import CategoryGrid from "@/components/shop/CategoryGrid";
 import FeaturedProducts from "@/components/shop/FeaturedProducts";
 import Footer from "@/components/shop/Footer";
 import CartDrawer from "@/components/shop/CartDrawer";
-import { ShoppingBag, Menu, X, User } from "lucide-react";
+import { ShoppingBag, Menu, X, User, LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/lib/AuthContext";
 
 export default function Home() {
+  const { user, logout } = useAuth();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sessionId] = useState(() => localStorage.getItem('session_id') || `session_${Date.now()}`);
@@ -88,9 +90,21 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-4">
+              {user && (
+                <div className="hidden md:flex items-center gap-2 text-sm text-neutral-600">
+                  <span>Hi, {user.name}</span>
+                </div>
+              )}
               <Link to={createPageUrl("Admin")} className="hidden md:flex w-10 h-10 rounded-full hover:bg-neutral-100 items-center justify-center transition-colors">
                 <User className="w-5 h-5 text-neutral-600" />
               </Link>
+              <button
+                onClick={logout}
+                className="hidden md:flex w-10 h-10 rounded-full hover:bg-neutral-100 items-center justify-center transition-colors"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 text-neutral-600" />
+              </button>
               <button
                 onClick={() => setIsCartOpen(true)}
                 className="relative w-10 h-10 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors"
@@ -122,10 +136,22 @@ export default function Home() {
               className="md:hidden border-t border-neutral-100 bg-white"
             >
               <div className="container mx-auto px-6 py-6 space-y-4">
+                {user && (
+                  <div className="pb-2 border-b border-neutral-200">
+                    <p className="text-sm text-neutral-600">Signed in as</p>
+                    <p className="text-lg font-medium text-neutral-900">{user.name}</p>
+                  </div>
+                )}
                 <Link to={createPageUrl("Shop")} className="block text-lg font-medium text-neutral-900">Shop</Link>
                 <a href="#" className="block text-lg font-medium text-neutral-900">Parts Catalog</a>
                 <a href="#" className="block text-lg font-medium text-neutral-900">Services</a>
                 <Link to={createPageUrl("Admin")} className="block text-lg font-medium text-neutral-900">Admin</Link>
+                <button
+                  onClick={logout}
+                  className="block text-lg font-medium text-red-600 w-full text-left"
+                >
+                  Logout
+                </button>
               </div>
             </motion.div>
           )}

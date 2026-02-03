@@ -4,6 +4,8 @@ export function createPageUrl(pageName) {
     Shop: '/shop',
     Admin: '/admin',
     Checkout: '/checkout',
+    Login: '/login',
+    Register: '/register',
   };
   return routes[pageName] || '/';
 }

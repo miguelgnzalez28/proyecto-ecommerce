@@ -20,6 +20,22 @@ const db = new sqlite3.Database('./emails.db', (err) => {
     console.error('Error opening database:', err.message);
   } else {
     console.log('Connected to SQLite database');
+    // Create users table if it doesn't exist
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`, (err) => {
+      if (err) {
+        console.error('Error creating users table:', err.message);
+      } else {
+        console.log('Users table ready');
+      }
+    });
+
     // Create emails table if it doesn't exist
     db.run(`CREATE TABLE IF NOT EXISTS emails (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,14 +121,23 @@ const db = new sqlite3.Database('./emails.db', (err) => {
         console.error('Error creating products table:', err.message);
       } else {
         console.log('Products table ready');
+        // Update existing products: change "accessories" to car parts categories
+        db.run(`UPDATE products SET category = 'engine' WHERE category = 'accessories'`, (err) => {
+          if (err) {
+            console.error('Error updating accessories category:', err.message);
+          } else {
+            console.log('Updated accessories products to engine category');
+          }
+        });
+        
         // Insert initial mock products if table is empty
         db.get('SELECT COUNT(*) as count FROM products', [], (err, row) => {
           if (!err && row.count === 0) {
             const initialProducts = [
               ['Air Filter - Premium', 'High-performance air filter for better engine performance', 29.99, 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=500', 'engine', 50, 1],
-              ['Brake Pads Set', 'Ceramic brake pads for reliable stopping power', 89.99, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500', 'engine', 30, 1],
-              ['Car Floor Mats', 'All-weather floor mats to protect your interior', 49.99, 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=500', 'accessories', 100, 0],
-              ['All-Season Tires (Set of 4)', 'Premium all-season tires for year-round driving', 599.99, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500', 'tires', 25, 0],
+              ['Brake Pads Set', 'Ceramic brake pads for reliable stopping power', 89.99, 'https://images.unsplash.com/photo-1625047509168-a7026f36de04?w=500', 'brakes', 30, 1],
+              ['Spark Plugs Set (4)', 'High-performance spark plugs for optimal engine performance', 49.99, 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=500', 'engine', 100, 0],
+              ['All-Season Tires (Set of 4)', 'Premium all-season tires for year-round driving', 599.99, 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=500', 'tires', 25, 1],
               ['Oil Filter', 'High-quality oil filter for engine protection', 12.99, 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=500', 'engine', 150, 1],
               ['Car Battery', 'Heavy-duty car battery with 3-year warranty', 129.99, 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=500', 'engine', 20, 0],
             ];
@@ -127,6 +152,88 @@ const db = new sqlite3.Database('./emails.db', (err) => {
       }
     });
   }
+});
+
+// Authentication API endpoints
+app.post('/api/auth/register', (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ success: false, message: 'Todos los campos son requeridos' });
+  }
+
+  // Validar nombre: solo letras, espacios, guiones y apóstrofes
+  const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
+  if (!nameRegex.test(name)) {
+    return res.status(400).json({ success: false, message: 'El nombre solo puede contener letras, espacios, guiones y apóstrofes' });
+  }
+
+  if (name.trim().length < 2) {
+    return res.status(400).json({ success: false, message: 'El nombre debe tener al menos 2 caracteres' });
+  }
+
+  // Validar email con regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, message: 'Por favor ingresa un correo electrónico válido' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: 'La contraseña debe tener al menos 6 caracteres' });
+  }
+
+  // Simple password hashing (in production, use bcrypt)
+  const hashedPassword = Buffer.from(password).toString('base64');
+
+  db.run('INSERT INTO users (name, email, password) VALUES (?, ?, ?)', [name, email, hashedPassword], function(err) {
+    if (err) {
+      if (err.message.includes('UNIQUE constraint')) {
+        return res.status(409).json({ success: false, message: 'Email already registered' });
+      }
+      return res.status(500).json({ success: false, message: 'Error creating account' });
+    }
+
+    // Also store email in emails table
+    db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], () => {});
+
+    const user = {
+      id: this.lastID,
+      name,
+      email,
+      created_at: new Date().toISOString(),
+    };
+
+    res.json({ success: true, message: 'Account created successfully', user });
+  });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email and password are required' });
+  }
+
+  const hashedPassword = Buffer.from(password).toString('base64');
+
+  db.get('SELECT id, name, email, created_at FROM users WHERE email = ? AND password = ?', [email, hashedPassword], (err, row) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: 'Error during login' });
+    }
+
+    if (!row) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    const user = {
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      created_at: row.created_at,
+    };
+
+    res.json({ success: true, message: 'Login successful', user });
+  });
 });
 
 // API endpoint to store email
@@ -305,15 +412,30 @@ app.put('/api/products/:id', (req, res) => {
 
 app.delete('/api/products/:id', (req, res) => {
   const { id } = req.params;
+  const productId = parseInt(id, 10);
   
-  db.run('DELETE FROM products WHERE id = ?', [id], function(err) {
+  if (isNaN(productId)) {
+    return res.status(400).json({ success: false, message: 'Invalid product ID' });
+  }
+  
+  // First, delete any cart items that reference this product
+  db.run('DELETE FROM cart_items WHERE product_id = ?', [productId], function(err) {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Error deleting product' });
+      console.error('Error deleting cart items:', err);
+      // Continue with product deletion even if cart items deletion fails
     }
-    if (this.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Product not found' });
-    }
-    res.json({ success: true, message: 'Product deleted successfully' });
+    
+    // Then delete the product
+    db.run('DELETE FROM products WHERE id = ?', [productId], function(err) {
+      if (err) {
+        console.error('Error deleting product:', err);
+        return res.status(500).json({ success: false, message: 'Error deleting product: ' + err.message });
+      }
+      if (this.changes === 0) {
+        return res.status(404).json({ success: false, message: 'Product not found' });
+      }
+      res.json({ success: true, message: 'Product deleted successfully' });
+    });
   });
 });
 

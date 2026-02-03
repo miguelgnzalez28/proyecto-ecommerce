@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/components/ui/toaster";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,11 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setIsDeleteDialogOpen(false);
       setProductToDelete(null);
+      toast('Product deleted successfully', 'success');
+    },
+    onError: (error) => {
+      console.error('Delete error:', error);
+      toast(error.message || 'Failed to delete product', 'error');
     }
   });
 

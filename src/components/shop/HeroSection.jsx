@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from "@/api/base44Client";
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
@@ -7,23 +6,6 @@ import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
 export default function HeroSection() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  useEffect(() => {
-    const checkAuth = async () => {
-      const authenticated = await base44.auth.isAuthenticated();
-      setIsAuthenticated(authenticated);
-    };
-    checkAuth();
-  }, []);
-
-  const handleShopClick = (e) => {
-    if (!isAuthenticated) {
-      e.preventDefault();
-      base44.auth.redirectToLogin(createPageUrl("Shop"));
-    }
-  };
-
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-gradient-to-br from-stone-50 via-white to-amber-50/30">
       <div className="absolute inset-0">
@@ -50,22 +32,12 @@ export default function HeroSection() {
               Quality components that deliver performance and reliability.
             </p>
             <div className="flex flex-wrap gap-4">
-              {isAuthenticated ? (
-                <Link to={createPageUrl("Shop")}>
-                  <Button className="px-8 py-6 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base group">
-                    Shop Parts
-                    <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Button>
-                </Link>
-              ) : (
-                <Button 
-                  onClick={handleShopClick}
-                  className="px-8 py-6 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base group"
-                >
-                  Login to Shop
+              <Link to={createPageUrl("Shop")}>
+                <Button className="px-8 py-6 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium text-base group">
+                  Shop Parts
                   <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
-              )}
+              </Link>
               <Button variant="outline" className="px-8 py-6 rounded-full border-neutral-300 hover:bg-neutral-100 font-medium text-base">
                 Our Story
               </Button>

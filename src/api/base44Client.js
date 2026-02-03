@@ -54,7 +54,11 @@ class Base44Client {
           const response = await fetch(`${baseUrl}/products/${id}`, {
             method: 'DELETE',
           });
-          return await response.json();
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.message || 'Failed to delete product');
+          }
+          return result;
         } catch (error) {
           console.error('Error deleting product:', error);
           throw error;

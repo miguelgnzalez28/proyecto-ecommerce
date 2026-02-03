@@ -18,15 +18,6 @@ export default function Checkout() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   
-  useEffect(() => {
-    const checkAuth = async () => {
-      const isAuthenticated = await base44.auth.isAuthenticated();
-      if (!isAuthenticated) {
-        base44.auth.redirectToLogin(window.location.href);
-      }
-    };
-    checkAuth();
-  }, []);
   
   const [formData, setFormData] = useState({
     email: '',
