@@ -15,11 +15,19 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 // Initialize database
-const db = new sqlite3.Database('./emails.db', (err) => {
+// In Vercel/serverless, use /tmp for writable filesystem
+// Note: /tmp is ephemeral in serverless, data will be lost between cold starts
+const isVercel = process.env.VERCEL || process.env.VERCEL_ENV;
+const dbPath = isVercel ? '/tmp/emails.db' : './emails.db';
+console.log('Initializing database at:', dbPath, 'Vercel:', !!isVercel);
+
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err.message);
+    console.error('Database path attempted:', dbPath);
+    console.error('Current working directory:', process.cwd());
   } else {
-    console.log('Connected to SQLite database');
+    console.log('Connected to SQLite database at:', dbPath);
     // Create users table if it doesn't exist
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,11 +198,25 @@ app.post('/api/auth/register', (req, res) => {
       if (err.message.includes('UNIQUE constraint')) {
         return res.status(409).json({ success: false, message: 'Email already registered' });
       }
+      console.error('Error creating user:', err);
       return res.status(500).json({ success: false, message: 'Error creating account' });
     }
 
-    // Also store email in emails table
-    db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], () => {});
+    // Also store email in emails table with proper error handling
+    // Use a callback to ensure it completes before responding
+    db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], function(emailErr) {
+      if (emailErr) {
+        // Log error but don't fail the registration
+        console.error('Error storing email in emails table:', emailErr);
+        console.error('Email that failed:', email);
+      } else {
+        if (this.changes > 0) {
+          console.log('Email stored successfully in emails table:', email);
+        } else {
+          console.log('Email already exists in emails table:', email);
+        }
+      }
+    });
 
     const user = {
       id: this.lastID,
@@ -244,14 +266,20 @@ app.post('/api/store-email', (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid email address' });
   }
 
-  db.run('INSERT INTO emails (email) VALUES (?)', [email], function(err) {
+  db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], function(err) {
     if (err) {
-      if (err.message.includes('UNIQUE constraint')) {
-        return res.status(409).json({ success: false, message: 'Email already exists' });
-      }
-      return res.status(500).json({ success: false, message: 'Error storing email' });
+      console.error('Error storing email:', err);
+      console.error('Email that failed:', email);
+      return res.status(500).json({ success: false, message: 'Error storing email', error: err.message });
     }
-    res.json({ success: true, message: 'Email stored successfully', id: this.lastID });
+    
+    if (this.changes > 0) {
+      console.log('Email stored successfully:', email, 'ID:', this.lastID);
+      res.json({ success: true, message: 'Email stored successfully', id: this.lastID });
+    } else {
+      console.log('Email already exists (ignored):', email);
+      res.json({ success: true, message: 'Email already exists', id: null });
+    }
   });
 });
 
