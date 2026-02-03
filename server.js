@@ -677,6 +677,13 @@ process.on('SIGINT', () => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Only start the server if not in Vercel (serverless)
+// In Vercel, the app is exported and handled by @vercel/node
+if (!process.env.VERCEL && !process.env.VERCEL_ENV) {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+// Export for Vercel serverless (must be at the end after all routes are configured)
+module.exports = app;
