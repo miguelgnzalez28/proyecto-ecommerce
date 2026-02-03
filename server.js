@@ -5,6 +5,16 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const fs = require('fs');
 
+// Vercel Blob Storage (optional, for production)
+let blobStorage = null;
+try {
+  const { put, get, list } = require('@vercel/blob');
+  blobStorage = { put, get, list };
+  console.log('Vercel Blob Storage available');
+} catch (error) {
+  console.log('Vercel Blob Storage not available, using SQLite only');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -204,7 +214,8 @@ app.post('/api/auth/register', (req, res) => {
 
     // Also store email in emails table with proper error handling
     // Use a callback to ensure it completes before responding
-    db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], function(emailErr) {
+    const userId = this.lastID;
+    db.run('INSERT OR IGNORE INTO emails (email) VALUES (?)', [email], async function(emailErr) {
       if (emailErr) {
         // Log error but don't fail the registration
         console.error('Error storing email in emails table:', emailErr);
@@ -212,6 +223,26 @@ app.post('/api/auth/register', (req, res) => {
       } else {
         if (this.changes > 0) {
           console.log('Email stored successfully in emails table:', email);
+          
+          // Also store in Vercel Blob Storage if available (for production backup)
+          if (blobStorage) {
+            try {
+              const emailData = {
+                email,
+                name,
+                userId: userId,
+                createdAt: new Date().toISOString(),
+              };
+              const filename = `emails/${email.replace('@', '_at_')}_${Date.now()}.json`;
+              await blobStorage.put(filename, JSON.stringify(emailData), {
+                access: 'public',
+                contentType: 'application/json',
+              });
+              console.log('Email also stored in Vercel Blob Storage:', filename);
+            } catch (blobError) {
+              console.error('Error storing email in Blob Storage (non-critical):', blobError);
+            }
+          }
         } else {
           console.log('Email already exists in emails table:', email);
         }
