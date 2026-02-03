@@ -8,6 +8,7 @@ import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/components/ui/toaster';
 import { useAuth } from '@/lib/AuthContext';
+import { getApiUrl } from '@/utils/api';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -28,13 +29,25 @@ export default function Login() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/login', {
+      const apiUrl = getApiUrl();
+      const url = `${apiUrl}/api/auth/login`;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      // Check if response is ok before trying to parse JSON
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        toast('Error en la respuesta del servidor. Por favor, inténtalo de nuevo.', 'error');
+        setIsLoading(false);
+        return;
+      }
 
       if (response.ok && data.success) {
         login(data.user);
@@ -45,7 +58,12 @@ export default function Login() {
       }
     } catch (error) {
       console.error('Login error:', error);
-      toast('Login failed. Please try again.', 'error');
+      // More specific error messages
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        toast('Error de conexión. Verifica que el servidor esté funcionando.', 'error');
+      } else {
+        toast('Login failed. Please try again.', 'error');
+      }
     } finally {
       setIsLoading(false);
     }

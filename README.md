@@ -100,6 +100,50 @@ The app will be available at `http://localhost:3000`
 
 The project uses Vite for fast development with hot module replacement. The Express server handles API requests and serves the built React app in production.
 
+## Deployment on Vercel
+
+### Frontend Deployment
+
+1. Build the React app:
+```bash
+npm run build
+```
+
+2. Deploy to Vercel:
+   - Connect your repository to Vercel
+   - Set the build command: `npm run build`
+   - Set the output directory: `dist`
+
+### Backend API Configuration
+
+If your backend API is hosted on a **different server** than your frontend:
+
+1. Set the `VITE_API_URL` environment variable in Vercel:
+   - Go to your Vercel project settings
+   - Navigate to "Environment Variables"
+   - Add `VITE_API_URL` with the full URL of your API server (e.g., `https://api.example.com`)
+
+If your backend API is on the **same domain** (Vercel serverless functions):
+   - Leave `VITE_API_URL` empty or unset
+   - The app will use relative paths which work with serverless functions
+
+### Troubleshooting API Issues on Vercel
+
+If you're experiencing issues with API calls on Vercel:
+
+1. **Check Environment Variables**: Ensure `VITE_API_URL` is set correctly if your backend is on a different server
+2. **Check CORS**: Ensure your backend server allows requests from your Vercel domain
+3. **Check Network Tab**: Open browser DevTools and check the Network tab to see the actual URL being called
+4. **Check Console**: Look for error messages in the browser console
+
+### Example Vercel Environment Variables
+
+```
+VITE_API_URL=https://your-backend-server.com
+```
+
+Or leave empty if using serverless functions on the same domain.
+
 ## License
 
 ISC
