@@ -567,6 +567,11 @@ app.post('/api/subscribers', (req, res) => {
   );
 });
 
+// 404 handler for API routes (must be after all other API routes)
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ success: false, message: 'API endpoint not found' });
+});
+
 // Serve static files from dist (production) or public (fallback)
 app.use(express.static('dist'));
 app.use(express.static('public'));
@@ -586,7 +591,23 @@ app.get('*', (req, res) => {
   }
 });
 
+// Error handling middleware (must be last, after all routes)
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  // Only send JSON for API routes
+  if (req.path.startsWith('/api')) {
+    res.status(err.status || 500).json({ 
+      success: false, 
+      message: err.message || 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+  } else {
+    res.status(err.status || 500).send('Internal server error');
+  }
+});
+
 // Graceful shutdown
+
 process.on('SIGINT', () => {
   db.close((err) => {
     if (err) {

@@ -38,23 +38,43 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
-      // Check if response is ok before trying to parse JSON
-      let data;
+      // Check if response has content before parsing
+      const contentType = response.headers.get('content-type');
+      let data = null;
+      let responseText = '';
+      
       try {
-        data = await response.json();
+        responseText = await response.text();
+        
+        if (contentType && contentType.includes('application/json')) {
+          if (responseText) {
+            data = JSON.parse(responseText);
+          }
+        } else {
+          // Response is not JSON
+          console.error('Non-JSON response:', responseText);
+          console.error('Content-Type:', contentType);
+          console.error('Status:', response.status);
+          toast(`Error del servidor (${response.status}). Por favor, inténtalo de nuevo.`, 'error');
+          setIsLoading(false);
+          return;
+        }
       } catch (parseError) {
         console.error('Error parsing response:', parseError);
+        console.error('Response status:', response.status);
+        console.error('Response text:', responseText);
+        console.error('Content-Type:', contentType);
         toast('Error en la respuesta del servidor. Por favor, inténtalo de nuevo.', 'error');
         setIsLoading(false);
         return;
       }
 
-      if (response.ok && data.success) {
+      if (response.ok && data && data.success) {
         login(data.user);
         toast('Login successful!', 'success');
         navigate(from, { replace: true });
       } else {
-        toast(data.message || 'Invalid email or password', 'error');
+        toast(data?.message || `Invalid email or password (${response.status})`, 'error');
       }
     } catch (error) {
       console.error('Login error:', error);
