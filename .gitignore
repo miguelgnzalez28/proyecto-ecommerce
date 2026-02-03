@@ -1,5 +1,7 @@
 node_modules/
-emails.db
-.env
-*.log
+dist/
+*.db
 .DS_Store
+.env
+.env.local
+*.log
