@@ -1,69 +1,127 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
 import NewsletterForm from './NewsletterForm';
-import { Link } from "react-router-dom";
-import { createPageUrl } from "@/utils";
-import { Instagram, Twitter, Facebook } from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
 
 export default function Footer() {
   return (
-    <footer className="bg-neutral-900 text-white">
-      <div className="container mx-auto px-6 lg:px-12 py-20">
-        <div className="grid lg:grid-cols-2 gap-16 mb-16">
+    <footer className="bg-zinc-950 border-t border-zinc-800" data-testid="footer">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
+          {/* Brand */}
           <div>
-            <h3 className="text-3xl font-light mb-4">
-              Stay in the Loop
-            </h3>
-            <p className="text-neutral-400 mb-8 max-w-md">
-              Subscribe for exclusive deals, new parts, and automotive tips from our experts.
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-10 h-10 bg-red-600 flex items-center justify-center">
+                <span className="text-xl font-bold text-white font-teko">A</span>
+              </div>
+              <span className="text-2xl font-bold tracking-tight text-white font-teko">
+                AUTO<span className="text-red-600">PARTS</span>
+              </span>
+            </div>
+            <p className="text-zinc-500 text-sm mb-6">
+              Tu tienda de confianza para repuestos y piezas de automóviles. Calidad garantizada al mejor precio.
             </p>
-            <NewsletterForm source="footer" />
+            <div className="flex gap-4">
+              <a href="#" className="w-10 h-10 border border-zinc-800 flex items-center justify-center hover:border-red-600 hover:bg-red-600/10 transition-colors">
+                <Facebook className="w-4 h-4 text-zinc-500 hover:text-white" />
+              </a>
+              <a href="#" className="w-10 h-10 border border-zinc-800 flex items-center justify-center hover:border-red-600 hover:bg-red-600/10 transition-colors">
+                <Instagram className="w-4 h-4 text-zinc-500 hover:text-white" />
+              </a>
+              <a href="#" className="w-10 h-10 border border-zinc-800 flex items-center justify-center hover:border-red-600 hover:bg-red-600/10 transition-colors">
+                <Twitter className="w-4 h-4 text-zinc-500 hover:text-white" />
+              </a>
+            </div>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-            <div>
-              <h4 className="font-semibold mb-4 text-sm uppercase tracking-wider">Shop</h4>
-              <ul className="space-y-3 text-neutral-400">
-                <li><Link to={createPageUrl("Shop")} className="hover:text-white transition-colors">All Products</Link></li>
-                <li><Link to={`${createPageUrl("Shop")}?category=engine`} className="hover:text-white transition-colors">Engine Parts</Link></li>
-                <li><Link to={`${createPageUrl("Shop")}?category=brakes`} className="hover:text-white transition-colors">Brakes</Link></li>
-                <li><Link to={`${createPageUrl("Shop")}?category=performance`} className="hover:text-white transition-colors">Performance</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-sm uppercase tracking-wider">Company</h4>
-              <ul className="space-y-3 text-neutral-400">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-sm uppercase tracking-wider">Support</h4>
-              <ul className="space-y-3 text-neutral-400">
-                <li><a href="#" className="hover:text-white transition-colors">FAQ</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Shipping</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Returns</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Size Guide</a></li>
-              </ul>
-            </div>
+
+          {/* Quick Links */}
+          <div>
+            <h3 className="text-lg font-bold text-white font-teko uppercase tracking-wider mb-6">
+              Enlaces Rápidos
+            </h3>
+            <ul className="space-y-3">
+              <li>
+                <Link to={createPageUrl('Shop')} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Tienda
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?sale_type=detal'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Venta al Detal
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?sale_type=mayor'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Venta al Mayor
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Admin')} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Mi Cuenta
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Categories */}
+          <div>
+            <h3 className="text-lg font-bold text-white font-teko uppercase tracking-wider mb-6">
+              Categorías
+            </h3>
+            <ul className="space-y-3">
+              <li>
+                <Link to={createPageUrl('Shop') + '?category=engine'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Motor
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?category=brakes'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Frenos
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?category=suspension'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Suspensión
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?category=electrical'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Eléctrico
+                </Link>
+              </li>
+              <li>
+                <Link to={createPageUrl('Shop') + '?category=tires'} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                  Neumáticos
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Newsletter */}
+          <div>
+            <h3 className="text-lg font-bold text-white font-teko uppercase tracking-wider mb-6">
+              Newsletter
+            </h3>
+            <p className="text-zinc-500 text-sm mb-4">
+              Suscríbete para recibir ofertas exclusivas y novedades.
+            </p>
+            <NewsletterForm />
           </div>
         </div>
-        
-        <div className="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-neutral-800">
-          <p className="text-neutral-500 text-sm mb-4 md:mb-0">
-            © 2026 AUTOPARTS. All rights reserved.
-          </p>
-          <div className="flex items-center gap-4">
-            <a href="#" className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center hover:bg-neutral-700 transition-colors">
-              <Instagram className="w-5 h-5" />
-            </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center hover:bg-neutral-700 transition-colors">
-              <Twitter className="w-5 h-5" />
-            </a>
-            <a href="#" className="w-10 h-10 rounded-full bg-neutral-800 flex items-center justify-center hover:bg-neutral-700 transition-colors">
-              <Facebook className="w-5 h-5" />
-            </a>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="border-t border-zinc-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <p className="text-zinc-600 text-sm">
+              © 2026 AutoParts Pro. Todos los derechos reservados.
+            </p>
+            <div className="flex gap-6">
+              <a href="#" className="text-zinc-600 hover:text-white text-sm transition-colors">Términos</a>
+              <a href="#" className="text-zinc-600 hover:text-white text-sm transition-colors">Privacidad</a>
+            </div>
           </div>
         </div>
       </div>

@@ -1,82 +1,56 @@
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { base44 } from "@/api/base44Client";
-import { Mail, ArrowRight, Check } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { toast } from "@/components/ui/toaster";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { api } from '@/api/base44Client';
+import { toast } from '@/components/ui/toaster';
+import { ArrowRight, Check } from 'lucide-react';
 
-export default function NewsletterForm({ source = "homepage" }) {
-  const [email, setEmail] = useState("");
+export default function NewsletterForm() {
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email) return;
-    
+
     setIsLoading(true);
     try {
-      await base44.entities.EmailSubscriber.create({
-        email,
-        subscribed_at: new Date().toISOString(),
-        source,
-        is_active: true
-      });
-      setIsSuccess(true);
-      setEmail("");
-      toast('Successfully subscribed!', 'success');
-      setTimeout(() => setIsSuccess(false), 3000);
+      await api.subscribers.create({ email, source: 'newsletter' });
+      setIsSubscribed(true);
+      toast('¡Te has suscrito exitosamente!', 'success');
+      setEmail('');
+      setTimeout(() => setIsSubscribed(false), 3000);
     } catch (error) {
-      console.error('Error subscribing:', error);
-      toast('Failed to subscribe. Please try again.', 'error');
+      toast(error.message || 'Error al suscribirse', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="relative">
-      <div className="flex gap-3">
-        <div className="relative flex-1">
-          <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-          <Input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="pl-12 pr-4 py-6 rounded-full border-neutral-200 focus:border-neutral-900 focus:ring-neutral-900 text-base"
-            required
-          />
-        </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3" data-testid="newsletter-form">
+      <div className="flex gap-2">
+        <Input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="tu@email.com"
+          className="flex-1 bg-zinc-900 border-zinc-800 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600"
+          required
+          data-testid="newsletter-email-input"
+        />
         <Button
           type="submit"
-          disabled={isLoading || isSuccess}
-          className="px-8 py-6 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white font-medium"
+          disabled={isLoading || isSubscribed}
+          className="px-4 bg-red-600 hover:bg-red-700 text-white rounded-none h-12"
+          data-testid="newsletter-submit-btn"
         >
-          <AnimatePresence mode="wait">
-            {isSuccess ? (
-              <motion.div
-                key="success"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-              >
-                <Check className="w-5 h-5" />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="arrow"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-                className="flex items-center gap-2"
-              >
-                Subscribe
-                <ArrowRight className="w-4 h-4" />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isSubscribed ? (
+            <Check className="w-5 h-5" />
+          ) : (
+            <ArrowRight className="w-5 h-5" />
+          )}
         </Button>
       </div>
     </form>
