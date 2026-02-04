@@ -504,7 +504,8 @@ async def create_product(product: ProductCreate):
     
     result = db.products.insert_one(product_doc)
     product_doc["id"] = str(result.inserted_id)
-    del product_doc["_id"] if "_id" in product_doc else None
+    if "_id" in product_doc:
+        del product_doc["_id"]
     
     return {"success": True, "product": product_doc}
 
