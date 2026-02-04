@@ -1,308 +1,308 @@
-// Base44 API Client
-// This is a mock implementation - replace with your actual base44 API client
+// AutoParts API Client
 
-const baseUrl = '/api';
+const getBaseUrl = () => {
+  // Use environment variable or default to relative path
+  return import.meta.env.VITE_API_URL || '';
+};
 
-class Base44Client {
-  entities = {
+const handleResponse = async (response) => {
+  const contentType = response.headers.get('content-type');
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || data.message || 'Request failed');
+    }
+    return data;
+  }
+  if (!response.ok) {
+    throw new Error('Request failed');
+  }
+  return response;
+};
+
+export const api = {
+  // Auth
+  auth: {
+    async register(data) {
+      const response = await fetch(`${getBaseUrl()}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+    async login(data) {
+      const response = await fetch(`${getBaseUrl()}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // Products
+  products: {
+    async list(params = {}) {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${getBaseUrl()}/api/products?${queryString}` : `${getBaseUrl()}/api/products`;
+      const response = await fetch(url);
+      const data = await handleResponse(response);
+      return data.products || [];
+    },
+    async get(id) {
+      const response = await fetch(`${getBaseUrl()}/api/products/${id}`);
+      const data = await handleResponse(response);
+      return data.product;
+    },
+    async create(data) {
+      const response = await fetch(`${getBaseUrl()}/api/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.product;
+    },
+    async update(id, data) {
+      const response = await fetch(`${getBaseUrl()}/api/products/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.product;
+    },
+    async delete(id) {
+      const response = await fetch(`${getBaseUrl()}/api/products/${id}`, {
+        method: 'DELETE',
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // Cart
+  cart: {
+    async get(sessionId) {
+      const response = await fetch(`${getBaseUrl()}/api/cart?session_id=${sessionId}`);
+      const data = await handleResponse(response);
+      return data.items || [];
+    },
+    async add(data) {
+      const response = await fetch(`${getBaseUrl()}/api/cart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.item;
+    },
+    async update(id, data) {
+      const response = await fetch(`${getBaseUrl()}/api/cart/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.item;
+    },
+    async remove(id) {
+      const response = await fetch(`${getBaseUrl()}/api/cart/${id}`, {
+        method: 'DELETE',
+      });
+      return handleResponse(response);
+    },
+    async clear(sessionId) {
+      const response = await fetch(`${getBaseUrl()}/api/cart/session/${sessionId}`, {
+        method: 'DELETE',
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // Orders
+  orders: {
+    async list(params = {}) {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${getBaseUrl()}/api/orders?${queryString}` : `${getBaseUrl()}/api/orders`;
+      const response = await fetch(url);
+      const data = await handleResponse(response);
+      return data.orders || [];
+    },
+    async get(id) {
+      const response = await fetch(`${getBaseUrl()}/api/orders/${id}`);
+      const data = await handleResponse(response);
+      return data.order;
+    },
+    async create(data) {
+      const response = await fetch(`${getBaseUrl()}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.order;
+    },
+    async createExternal(data) {
+      const response = await fetch(`${getBaseUrl()}/api/orders/external`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.order;
+    },
+    async update(id, data) {
+      const response = await fetch(`${getBaseUrl()}/api/orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.order;
+    },
+    getPdfUrl(orderId, docType = 'ticket') {
+      return `${getBaseUrl()}/api/orders/${orderId}/pdf?doc_type=${docType}`;
+    },
+  },
+
+  // Config
+  config: {
+    async getBank() {
+      const response = await fetch(`${getBaseUrl()}/api/config/bank`);
+      const data = await handleResponse(response);
+      return data.config || {};
+    },
+    async updateBank(data) {
+      const response = await fetch(`${getBaseUrl()}/api/config/bank`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.config;
+    },
+    async getCompany() {
+      const response = await fetch(`${getBaseUrl()}/api/config/company`);
+      const data = await handleResponse(response);
+      return data.config || {};
+    },
+    async updateCompany(data) {
+      const response = await fetch(`${getBaseUrl()}/api/config/company`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.config;
+    },
+  },
+
+  // Chatbot
+  chatbot: {
+    async getResponses() {
+      const response = await fetch(`${getBaseUrl()}/api/chatbot/responses`);
+      const data = await handleResponse(response);
+      return data.responses || [];
+    },
+    async createResponse(data) {
+      const response = await fetch(`${getBaseUrl()}/api/chatbot/responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.response;
+    },
+    async updateResponse(id, data) {
+      const response = await fetch(`${getBaseUrl()}/api/chatbot/responses/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.response;
+    },
+    async deleteResponse(id) {
+      const response = await fetch(`${getBaseUrl()}/api/chatbot/responses/${id}`, {
+        method: 'DELETE',
+      });
+      return handleResponse(response);
+    },
+    async query(message) {
+      const response = await fetch(`${getBaseUrl()}/api/chatbot/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      return handleResponse(response);
+    },
+  },
+
+  // Subscribers
+  subscribers: {
+    async list() {
+      const response = await fetch(`${getBaseUrl()}/api/subscribers`);
+      const data = await handleResponse(response);
+      return data.subscribers || [];
+    },
+    async create(data) {
+      const response = await fetch(`${getBaseUrl()}/api/subscribers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await handleResponse(response);
+      return result.subscriber;
+    },
+  },
+
+  // Stats
+  stats: {
+    async get() {
+      const response = await fetch(`${getBaseUrl()}/api/stats`);
+      const data = await handleResponse(response);
+      return data.stats || {};
+    },
+  },
+
+  // Reports
+  reports: {
+    async getSales(params = {}) {
+      const queryString = new URLSearchParams(params).toString();
+      const url = queryString ? `${getBaseUrl()}/api/reports/sales?${queryString}` : `${getBaseUrl()}/api/reports/sales`;
+      const response = await fetch(url);
+      const data = await handleResponse(response);
+      return data.report || {};
+    },
+  },
+};
+
+// Keep backward compatibility with base44
+export const base44 = {
+  entities: {
     Product: {
-      async list() {
-        try {
-          const response = await fetch(`${baseUrl}/products`);
-          if (!response.ok) {
-            // Fallback to mock data
-            return this._getMockProducts();
-          }
-          const data = await response.json();
-          return data.products || data || [];
-        } catch (error) {
-          console.error('Error fetching products:', error);
-          // Return empty array instead of mock data when API fails
-          return [];
-        }
-      },
-      async create(data) {
-        try {
-          const response = await fetch(`${baseUrl}/products`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.product || result;
-        } catch (error) {
-          console.error('Error creating product:', error);
-          throw error;
-        }
-      },
-      async update(id, data) {
-        try {
-          const response = await fetch(`${baseUrl}/products/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.product || result;
-        } catch (error) {
-          console.error('Error updating product:', error);
-          throw error;
-        }
-      },
-      async delete(id) {
-        try {
-          const response = await fetch(`${baseUrl}/products/${id}`, {
-            method: 'DELETE',
-          });
-          const result = await response.json();
-          if (!response.ok) {
-            throw new Error(result.message || 'Failed to delete product');
-          }
-          return result;
-        } catch (error) {
-          console.error('Error deleting product:', error);
-          throw error;
-        }
-      },
-      _getMockProducts() {
-        // Mock products - replace with actual API call
-        return [
-          {
-            id: 1,
-            name: 'Premium Headphones',
-            price: 299.99,
-            image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500',
-            category: 'electronics',
-            inventory: 50,
-            featured: true,
-          },
-          {
-            id: 2,
-            name: 'Smart Watch',
-            price: 399.99,
-            image_url: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500',
-            category: 'electronics',
-            inventory: 30,
-            featured: true,
-          },
-          {
-            id: 3,
-            name: 'Designer Sunglasses',
-            price: 199.99,
-            image_url: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=500',
-            category: 'accessories',
-            inventory: 100,
-            featured: false,
-          },
-          {
-            id: 4,
-            name: 'Leather Jacket',
-            price: 599.99,
-            image_url: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=500',
-            category: 'clothing',
-            inventory: 25,
-            featured: false,
-          },
-          {
-            id: 5,
-            name: 'Luxury Watch',
-            price: 1299.99,
-            image_url: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=500',
-            category: 'accessories',
-            inventory: 15,
-            featured: true,
-          },
-          {
-            id: 6,
-            name: 'Designer Handbag',
-            price: 899.99,
-            image_url: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=500',
-            category: 'accessories',
-            inventory: 20,
-            featured: false,
-          },
-        ];
-      },
+      async list() { return api.products.list(); },
+      async create(data) { return api.products.create(data); },
+      async update(id, data) { return api.products.update(id, data); },
+      async delete(id) { return api.products.delete(id); },
     },
     Order: {
-      async list(sort = '-created_date') {
-        try {
-          const response = await fetch(`${baseUrl}/orders${sort ? `?sort=${sort}` : ''}`);
-          if (!response.ok) {
-            return this._getMockOrders();
-          }
-          const data = await response.json();
-          return data.orders || data || [];
-        } catch (error) {
-          console.error('Error fetching orders:', error);
-          return this._getMockOrders();
-        }
-      },
-      async create(data) {
-        try {
-          const response = await fetch(`${baseUrl}/orders`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.order || result;
-        } catch (error) {
-          console.error('Error creating order:', error);
-          throw error;
-        }
-      },
-      async update(id, data) {
-        try {
-          const response = await fetch(`${baseUrl}/orders/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.order || result;
-        } catch (error) {
-          console.error('Error updating order:', error);
-          throw error;
-        }
-      },
-      _getMockOrders() {
-        return [
-          {
-            id: 'ord_1234567890',
-            customer_name: 'John Doe',
-            customer_email: 'john@example.com',
-            total: 1299.99,
-            status: 'paid',
-            payment_method: 'credit_card',
-            created_date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'ord_0987654321',
-            customer_name: 'Jane Smith',
-            customer_email: 'jane@example.com',
-            total: 599.99,
-            status: 'shipped',
-            payment_method: 'paypal',
-            created_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        ];
-      },
+      async list(sort) { return api.orders.list(); },
+      async create(data) { return api.orders.create(data); },
+      async update(id, data) { return api.orders.update(id, data); },
     },
     EmailSubscriber: {
-      async list(sort = '-created_date') {
-        try {
-          const response = await fetch(`${baseUrl}/subscribers${sort ? `?sort=${sort}` : ''}`);
-          if (!response.ok) {
-            return this._getMockSubscribers();
-          }
-          const data = await response.json();
-          return data.subscribers || data || [];
-        } catch (error) {
-          console.error('Error fetching subscribers:', error);
-          return this._getMockSubscribers();
-        }
-      },
-      async create(data) {
-        try {
-          const response = await fetch(`${baseUrl}/subscribers`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.subscriber || result;
-        } catch (error) {
-          console.error('Error creating subscriber:', error);
-          throw error;
-        }
-      },
-      _getMockSubscribers() {
-        return [
-          {
-            id: 'sub_1',
-            email: 'subscriber1@example.com',
-            source: 'website',
-            is_active: true,
-            subscribed_at: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          {
-            id: 'sub_2',
-            email: 'subscriber2@example.com',
-            source: 'checkout',
-            is_active: true,
-            subscribed_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        ];
-      },
+      async list() { return api.subscribers.list(); },
+      async create(data) { return api.subscribers.create(data); },
     },
     CartItem: {
-      async filter({ session_id }) {
-        try {
-          const response = await fetch(`${baseUrl}/cart?session_id=${session_id}`);
-          if (!response.ok) return [];
-          const data = await response.json();
-          return data.items || [];
-        } catch (error) {
-          console.error('Error fetching cart items:', error);
-          return [];
-        }
-      },
-      async create(data) {
-        try {
-          const response = await fetch(`${baseUrl}/cart`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.item || result;
-        } catch (error) {
-          console.error('Error creating cart item:', error);
-          throw error;
-        }
-      },
-      async update(id, data) {
-        try {
-          const response = await fetch(`${baseUrl}/cart/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-          });
-          const result = await response.json();
-          return result.item || result;
-        } catch (error) {
-          console.error('Error updating cart item:', error);
-          throw error;
-        }
-      },
-      async delete(id) {
-        try {
-          const response = await fetch(`${baseUrl}/cart/${id}`, {
-            method: 'DELETE',
-          });
-          return await response.json();
-        } catch (error) {
-          console.error('Error deleting cart item:', error);
-          throw error;
-        }
-      },
+      async filter({ session_id }) { return api.cart.get(session_id); },
+      async create(data) { return api.cart.add(data); },
+      async update(id, data) { return api.cart.update(id, data); },
+      async delete(id) { return api.cart.remove(id); },
     },
-  };
+  },
+};
 
-  auth = {
-    async isAuthenticated() {
-      // For now, always return true - implement actual auth check later
-      // You can check localStorage, cookies, or make an API call
-      return true;
-    },
-    redirectToLogin(returnUrl) {
-      // Implement actual login redirect logic
-      // For now, just log it
-      console.log('Redirect to login with return URL:', returnUrl);
-      // window.location.href = `/login?return=${encodeURIComponent(returnUrl)}`;
-    },
-  };
-}
-
-export const base44 = new Base44Client();
+export default api;
