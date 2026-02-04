@@ -359,7 +359,7 @@ class AutoPartsAPITester:
         }
         
         success, data = self.make_request('POST', 'subscribers', subscriber_data)
-        self.log_test("Create Subscriber", success, "Subscriber created")
+        self.log_test("Create Subscriber", success, f"Subscriber created, Response: {data}")
         
         # Get subscribers
         success, data = self.make_request('GET', 'subscribers')
