@@ -90,7 +90,7 @@ function Toast({ toast: toastItem, onRemove }) {
           {icons[toastItem.type] || icons.info}
         </div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-neutral-900">{toastItem.message}</p>
+          <p className="text-sm font-medium text-white">{toastItem.message}</p>
         </div>
         <button
           onClick={() => onRemove(toastItem.id)}
