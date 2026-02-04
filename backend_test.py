@@ -280,7 +280,7 @@ class AutoPartsAPITester:
         success, data = self.make_request('POST', 'orders/external', external_order)
         order_id = data.get('order', {}).get('order_id') if success else None
         self.log_test("Create External Order", success and order_id, 
-                     f"Created external order: {order_id}")
+                     f"Created external order: {order_id}, Response: {data}")
 
     def test_config_operations(self):
         """Test configuration operations"""
