@@ -669,6 +669,8 @@ async def create_order(order: OrderCreate):
     
     result = db.orders.insert_one(order_doc)
     order_doc["id"] = str(result.inserted_id)
+    if "_id" in order_doc:
+        del order_doc["_id"]
     
     return {"success": True, "order": order_doc}
 
