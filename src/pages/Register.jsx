@@ -3,12 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, User, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/components/ui/toaster';
 import { useAuth } from '@/lib/AuthContext';
-import { getApiUrl } from '@/utils/api';
+import { api } from '@/api/base44Client';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -19,75 +18,55 @@ export default function Register() {
     password: '',
     confirmPassword: '',
   });
-  const [errors, setErrors] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
+  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Validación de nombre: solo letras, espacios, guiones y apóstrofes
   const validateName = (name) => {
     const nameRegex = /^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$/;
-    if (!name.trim()) {
-      return 'El nombre es requerido';
-    }
-    if (!nameRegex.test(name)) {
-      return 'El nombre solo puede contener letras, espacios, guiones y apóstrofes';
-    }
-    if (name.trim().length < 2) {
-      return 'El nombre debe tener al menos 2 caracteres';
-    }
+    if (!name.trim()) return 'El nombre es requerido';
+    if (!nameRegex.test(name)) return 'El nombre solo puede contener letras';
+    if (name.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
     return '';
   };
 
-  // Validación de email
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email.trim()) {
-      return 'El correo electrónico es requerido';
-    }
-    if (!emailRegex.test(email)) {
-      return 'Por favor ingresa un correo electrónico válido';
-    }
+    if (!email.trim()) return 'El correo es requerido';
+    if (!emailRegex.test(email)) return 'Correo electrónico inválido';
     return '';
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Validar en tiempo real
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
     if (name === 'name') {
-      setErrors(prev => ({ ...prev, name: validateName(value) }));
+      setErrors((prev) => ({ ...prev, name: validateName(value) }));
     } else if (name === 'email') {
-      setErrors(prev => ({ ...prev, email: validateEmail(value) }));
+      setErrors((prev) => ({ ...prev, email: validateEmail(value) }));
     } else if (name === 'password') {
       if (value.length > 0 && value.length < 6) {
-        setErrors(prev => ({ ...prev, password: 'La contraseña debe tener al menos 6 caracteres' }));
+        setErrors((prev) => ({ ...prev, password: 'Mínimo 6 caracteres' }));
       } else {
-        setErrors(prev => ({ ...prev, password: '' }));
+        setErrors((prev) => ({ ...prev, password: '' }));
       }
-      // Validar confirmación de contraseña si ya tiene valor
       if (formData.confirmPassword && value !== formData.confirmPassword) {
-        setErrors(prev => ({ ...prev, confirmPassword: 'Las contraseñas no coinciden' }));
+        setErrors((prev) => ({ ...prev, confirmPassword: 'Las contraseñas no coinciden' }));
       } else if (formData.confirmPassword) {
-        setErrors(prev => ({ ...prev, confirmPassword: '' }));
+        setErrors((prev) => ({ ...prev, confirmPassword: '' }));
       }
     } else if (name === 'confirmPassword') {
       if (value && value !== formData.password) {
-        setErrors(prev => ({ ...prev, confirmPassword: 'Las contraseñas no coinciden' }));
+        setErrors((prev) => ({ ...prev, confirmPassword: 'Las contraseñas no coinciden' }));
       } else {
-        setErrors(prev => ({ ...prev, confirmPassword: '' }));
+        setErrors((prev) => ({ ...prev, confirmPassword: '' }));
       }
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validar todos los campos
+
     const nameError = validateName(formData.name);
     const emailError = validateEmail(formData.email);
     let passwordError = '';
@@ -96,11 +75,11 @@ export default function Register() {
     if (!formData.password) {
       passwordError = 'La contraseña es requerida';
     } else if (formData.password.length < 6) {
-      passwordError = 'La contraseña debe tener al menos 6 caracteres';
+      passwordError = 'Mínimo 6 caracteres';
     }
 
     if (!formData.confirmPassword) {
-      confirmPasswordError = 'Por favor confirma tu contraseña';
+      confirmPasswordError = 'Confirma tu contraseña';
     } else if (formData.password !== formData.confirmPassword) {
       confirmPasswordError = 'Las contraseñas no coinciden';
     }
@@ -112,220 +91,158 @@ export default function Register() {
       confirmPassword: confirmPasswordError,
     });
 
-    // Si hay errores, no enviar el formulario
     if (nameError || emailError || passwordError || confirmPasswordError) {
-      toast('Por favor corrige los errores en el formulario', 'error');
+      toast('Por favor corrige los errores', 'error');
       return;
     }
 
     setIsLoading(true);
     try {
-      const apiUrl = getApiUrl();
-      const url = `${apiUrl}/api/auth/register`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        }),
+      const response = await api.auth.register({
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
       });
-
-      // Check if response has content before parsing
-      const contentType = response.headers.get('content-type');
-      let data = null;
-      let responseText = '';
-      
-      try {
-        responseText = await response.text();
-        
-        if (contentType && contentType.includes('application/json')) {
-          if (responseText) {
-            data = JSON.parse(responseText);
-          }
-        } else {
-          // Response is not JSON
-          console.error('Non-JSON response:', responseText);
-          console.error('Content-Type:', contentType);
-          console.error('Status:', response.status);
-          toast(`Error del servidor (${response.status}). Por favor, inténtalo de nuevo.`, 'error');
-          setIsLoading(false);
-          return;
-        }
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        console.error('Response status:', response.status);
-        console.error('Response text:', responseText);
-        console.error('Content-Type:', contentType);
-        toast('Error en la respuesta del servidor. Por favor, inténtalo de nuevo.', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      if (response.ok && data && data.success) {
-        login(data.user);
-        toast('¡Registro exitoso!', 'success');
-        navigate('/');
-      } else {
-        toast(data?.message || `Error en el registro (${response.status})`, 'error');
-      }
+      login(response.user);
+      localStorage.setItem('token', response.access_token);
+      toast('¡Cuenta creada exitosamente!', 'success');
+      navigate('/');
     } catch (error) {
-      console.error('Registration error:', error);
-      // More specific error messages
-      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        toast('Error de conexión. Verifica que el servidor esté funcionando.', 'error');
-      } else {
-        toast('Error en el registro. Por favor, inténtalo de nuevo.', 'error');
-      }
+      toast(error.message || 'Error al crear la cuenta', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-amber-50/30 flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12" data-testid="register-page">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <Card className="border-0 shadow-xl">
-          <CardHeader className="text-center pb-8">
-            <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">A</span>
+        <div className="bg-zinc-900 border border-zinc-800 p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-red-600 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl font-bold text-white font-teko">A</span>
             </div>
-            <CardTitle className="text-3xl font-light">
+            <h1 className="text-3xl font-bold text-white font-teko uppercase tracking-wider">
               Crear Cuenta
-            </CardTitle>
-            <p className="text-neutral-500 mt-2">
-              Regístrate para comenzar a comprar repuestos
+            </h1>
+            <p className="text-zinc-500 mt-2">
+              Regístrate para comenzar a comprar
             </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="name" className="text-sm font-medium text-neutral-700">
-                  Nombre Completo
-                </Label>
-                <div className="relative mt-1.5">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="name"
-                    name="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className={`pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600 ${
-                      errors.name ? 'border-red-500' : ''
-                    }`}
-                    placeholder="Juan Pérez"
-                    required
-                  />
-                </div>
-                {errors.name && (
-                  <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                )}
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="name" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Nombre Completo
+              </Label>
+              <div className="relative mt-2">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className={`pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600 ${errors.name ? 'border-red-500' : ''}`}
+                  placeholder="Juan Pérez"
+                  required
+                  data-testid="register-name-input"
+                />
               </div>
-
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-neutral-700">
-                  Correo Electrónico
-                </Label>
-                <div className="relative mt-1.5">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600 ${
-                      errors.email ? 'border-red-500' : ''
-                    }`}
-                    placeholder="correo@ejemplo.com"
-                    required
-                  />
-                </div>
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="password" className="text-sm font-medium text-neutral-700">
-                  Contraseña
-                </Label>
-                <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={`pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600 ${
-                      errors.password ? 'border-red-500' : ''
-                    }`}
-                    placeholder="Mínimo 6 caracteres"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                {errors.password && (
-                  <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                )}
-              </div>
-
-              <div>
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-neutral-700">
-                  Confirmar Contraseña
-                </Label>
-                <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    className={`pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600 ${
-                      errors.confirmPassword ? 'border-red-500' : ''
-                    }`}
-                    placeholder="Confirma tu contraseña"
-                    required
-                  />
-                </div>
-                {errors.confirmPassword && (
-                  <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-                )}
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-6 rounded-full bg-red-600 hover:bg-red-700 text-white font-medium text-base"
-              >
-                {isLoading ? 'Creando cuenta...' : (
-                  <>
-                    Crear Cuenta
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-neutral-600">
-                ¿Ya tienes una cuenta?{' '}
-                <Link to="/login" className="text-red-600 font-medium hover:text-red-700">
-                  Inicia sesión
-                </Link>
-              </p>
+              {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
             </div>
-          </CardContent>
-        </Card>
+
+            <div>
+              <Label htmlFor="email" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Correo Electrónico
+              </Label>
+              <div className="relative mt-2">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className={`pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600 ${errors.email ? 'border-red-500' : ''}`}
+                  placeholder="tu@email.com"
+                  required
+                  data-testid="register-email-input"
+                />
+              </div>
+              {errors.email && <p className="mt-1 text-sm text-red-500">{errors.email}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="password" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Contraseña
+              </Label>
+              <div className="relative mt-2">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={`pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600 ${errors.password ? 'border-red-500' : ''}`}
+                  placeholder="Mínimo 6 caracteres"
+                  required
+                  data-testid="register-password-input"
+                />
+              </div>
+              {errors.password && <p className="mt-1 text-sm text-red-500">{errors.password}</p>}
+            </div>
+
+            <div>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Confirmar Contraseña
+              </Label>
+              <div className="relative mt-2">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  className={`pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                  placeholder="Repite tu contraseña"
+                  required
+                  data-testid="register-confirm-password-input"
+                />
+              </div>
+              {errors.confirmPassword && <p className="mt-1 text-sm text-red-500">{errors.confirmPassword}</p>}
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-6 bg-red-600 hover:bg-red-700 text-white font-bold uppercase tracking-wider rounded-none"
+              data-testid="register-submit-btn"
+            >
+              {isLoading ? 'Creando cuenta...' : (
+                <>
+                  Crear Cuenta
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-zinc-500">
+              ¿Ya tienes una cuenta?{' '}
+              <Link to="/login" className="text-red-500 font-medium hover:text-red-400">
+                Inicia sesión
+              </Link>
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   );

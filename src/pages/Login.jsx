@@ -1,175 +1,125 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mail, Lock, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '@/components/ui/toaster';
 import { useAuth } from '@/lib/AuthContext';
-import { getApiUrl } from '@/utils/api';
+import { api } from '@/api/base44Client';
 
 export default function Login() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const from = location.state?.from?.pathname || '/';
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!email || !password) {
-      toast('Please fill in all fields', 'error');
+      toast('Por favor completa todos los campos', 'error');
       return;
     }
 
     setIsLoading(true);
     try {
-      const apiUrl = getApiUrl();
-      const url = `${apiUrl}/api/auth/login`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      // Check if response has content before parsing
-      const contentType = response.headers.get('content-type');
-      let data = null;
-      let responseText = '';
-      
-      try {
-        responseText = await response.text();
-        
-        if (contentType && contentType.includes('application/json')) {
-          if (responseText) {
-            data = JSON.parse(responseText);
-          }
-        } else {
-          // Response is not JSON
-          console.error('Non-JSON response:', responseText);
-          console.error('Content-Type:', contentType);
-          console.error('Status:', response.status);
-          toast(`Error del servidor (${response.status}). Por favor, inténtalo de nuevo.`, 'error');
-          setIsLoading(false);
-          return;
-        }
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        console.error('Response status:', response.status);
-        console.error('Response text:', responseText);
-        console.error('Content-Type:', contentType);
-        toast('Error en la respuesta del servidor. Por favor, inténtalo de nuevo.', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      if (response.ok && data && data.success) {
-        login(data.user);
-        toast('Login successful!', 'success');
-        navigate(from, { replace: true });
-      } else {
-        toast(data?.message || `Invalid email or password (${response.status})`, 'error');
-      }
+      const response = await api.auth.login({ email, password });
+      login(response.user);
+      localStorage.setItem('token', response.access_token);
+      toast('¡Bienvenido de vuelta!', 'success');
+      navigate('/');
     } catch (error) {
-      console.error('Login error:', error);
-      // More specific error messages
-      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-        toast('Error de conexión. Verifica que el servidor esté funcionando.', 'error');
-      } else {
-        toast('Login failed. Please try again.', 'error');
-      }
+      toast(error.message || 'Credenciales inválidas', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-stone-50 via-white to-amber-50/30 flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-background flex items-center justify-center px-6 py-12" data-testid="login-page">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        <Card className="border-0 shadow-xl">
-          <CardHeader className="text-center pb-8">
-            <div className="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl font-bold text-white">A</span>
+        <div className="bg-zinc-900 border border-zinc-800 p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-red-600 flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl font-bold text-white font-teko">A</span>
             </div>
-            <CardTitle className="text-3xl font-light">
-              Welcome Back
-            </CardTitle>
-            <p className="text-neutral-500 mt-2">
-              Sign in to your account to continue
+            <h1 className="text-3xl font-bold text-white font-teko uppercase tracking-wider">
+              Iniciar Sesión
+            </h1>
+            <p className="text-zinc-500 mt-2">
+              Accede a tu cuenta para continuar
             </p>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <Label htmlFor="email" className="text-sm font-medium text-neutral-700">
-                  Email Address
-                </Label>
-                <div className="relative mt-1.5">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600"
-                    placeholder="you@example.com"
-                    required
-                  />
-                </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="email" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Correo Electrónico
+              </Label>
+              <div className="relative mt-2">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600"
+                  placeholder="tu@email.com"
+                  required
+                  data-testid="login-email-input"
+                />
               </div>
-
-              <div>
-                <Label htmlFor="password" className="text-sm font-medium text-neutral-700">
-                  Password
-                </Label>
-                <div className="relative mt-1.5">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 rounded-lg border-neutral-200 focus:border-red-600 focus:ring-red-600"
-                    placeholder="Enter your password"
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-6 rounded-full bg-red-600 hover:bg-red-700 text-white font-medium text-base"
-              >
-                {isLoading ? 'Signing in...' : (
-                  <>
-                    Sign In
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-neutral-600">
-                Don't have an account?{' '}
-                <Link to="/register" className="text-red-600 font-medium hover:text-red-700">
-                  Sign up
-                </Link>
-              </p>
             </div>
-          </CardContent>
-        </Card>
+
+            <div>
+              <Label htmlFor="password" className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+                Contraseña
+              </Label>
+              <div className="relative mt-2">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="pl-10 bg-zinc-800 border-zinc-700 focus:border-red-600 rounded-none h-12 text-white placeholder:text-zinc-600"
+                  placeholder="Tu contraseña"
+                  required
+                  data-testid="login-password-input"
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-6 bg-red-600 hover:bg-red-700 text-white font-bold uppercase tracking-wider rounded-none"
+              data-testid="login-submit-btn"
+            >
+              {isLoading ? 'Iniciando sesión...' : (
+                <>
+                  Iniciar Sesión
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </>
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-zinc-500">
+              ¿No tienes una cuenta?{' '}
+              <Link to="/register" className="text-red-500 font-medium hover:text-red-400">
+                Regístrate
+              </Link>
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
