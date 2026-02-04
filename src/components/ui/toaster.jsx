@@ -72,10 +72,10 @@ function Toast({ toast: toastItem, onRemove }) {
   };
 
   const bgColors = {
-    success: 'bg-green-50 border-green-200',
-    error: 'bg-red-50 border-red-200',
-    warning: 'bg-yellow-50 border-yellow-200',
-    info: 'bg-blue-50 border-blue-200',
+    success: 'bg-zinc-900 border-green-600',
+    error: 'bg-zinc-900 border-red-600',
+    warning: 'bg-zinc-900 border-yellow-600',
+    info: 'bg-zinc-900 border-blue-600',
   };
 
   return (
