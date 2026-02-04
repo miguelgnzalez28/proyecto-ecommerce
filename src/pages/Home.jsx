@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from "@/api/base44Client";
+import { api } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import HeroSection from "@/components/shop/HeroSection";
 import CategoryGrid from "@/components/shop/CategoryGrid";
 import FeaturedProducts from "@/components/shop/FeaturedProducts";
 import Footer from "@/components/shop/Footer";
 import CartDrawer from "@/components/shop/CartDrawer";
-import { ShoppingBag, Menu, X, User, LogOut } from "lucide-react";
+import Chatbot from "@/components/shop/Chatbot";
+import { ShoppingBag, Menu, X, User, LogOut, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,29 +25,36 @@ export default function Home() {
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
-    queryFn: () => base44.entities.Product.list(),
+    queryFn: () => api.products.list(),
   });
 
   const { data: cartItems = [], refetch: refetchCart } = useQuery({
     queryKey: ['cart', sessionId],
-    queryFn: () => base44.entities.CartItem.filter({ session_id: sessionId }),
+    queryFn: () => api.cart.get(sessionId),
   });
 
-  const addToCart = async (product) => {
-    const existingItem = cartItems.find(item => item.product_id === product.id);
+  const addToCart = async (product, saleType = 'detal') => {
+    const price = saleType === 'mayor' && product.price_wholesale 
+      ? product.price_wholesale 
+      : product.price;
+    
+    const existingItem = cartItems.find(
+      item => item.product_id === product.id && item.sale_type === saleType
+    );
     
     if (existingItem) {
-      await base44.entities.CartItem.update(existingItem.id, {
+      await api.cart.update(existingItem.id, {
         quantity: existingItem.quantity + 1
       });
     } else {
-      await base44.entities.CartItem.create({
+      await api.cart.add({
         product_id: product.id,
         product_name: product.name,
         product_image: product.image_url,
-        product_price: product.price,
+        product_price: price,
         quantity: 1,
-        session_id: sessionId
+        session_id: sessionId,
+        sale_type: saleType
       });
     }
     refetchCart();
@@ -55,72 +63,80 @@ export default function Home() {
 
   const updateCartQuantity = async (itemId, quantity) => {
     if (quantity <= 0) {
-      await base44.entities.CartItem.delete(itemId);
+      await api.cart.remove(itemId);
     } else {
-      await base44.entities.CartItem.update(itemId, { quantity });
+      await api.cart.update(itemId, { quantity });
     }
     refetchCart();
   };
 
   const removeFromCart = async (itemId) => {
-    await base44.entities.CartItem.delete(itemId);
+    await api.cart.remove(itemId);
     refetchCart();
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background noise-overlay">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-neutral-100">
-        <div className="container mx-auto px-6 lg:px-12">
+      <nav className="fixed top-0 left-0 right-0 z-50 glass border-b border-zinc-800" data-testid="main-nav">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
-            <Link to={createPageUrl("Home")} className="text-2xl font-bold tracking-tight text-neutral-900">
-              <span className="text-red-600">AUTO</span>PARTS
+            <Link to={createPageUrl("Home")} className="flex items-center gap-2" data-testid="logo-link">
+              <div className="w-10 h-10 bg-red-600 flex items-center justify-center">
+                <span className="text-xl font-bold text-white font-teko">A</span>
+              </div>
+              <span className="text-2xl font-bold tracking-tight text-white font-teko">
+                AUTO<span className="text-red-600">PARTS</span>
+              </span>
             </Link>
             
             <div className="hidden md:flex items-center gap-8">
-              <Link to={createPageUrl("Shop")} className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
-                Shop
+              <Link to={createPageUrl("Shop")} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors uppercase tracking-wider" data-testid="nav-shop">
+                Tienda
               </Link>
-              <a href="#" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
-                Parts Catalog
-              </a>
-              <a href="#" className="text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors">
-                Services
-              </a>
+              <Link to={createPageUrl("Shop") + "?sale_type=detal"} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors uppercase tracking-wider" data-testid="nav-detal">
+                Detal
+              </Link>
+              <Link to={createPageUrl("Shop") + "?sale_type=mayor"} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors uppercase tracking-wider" data-testid="nav-mayor">
+                Mayor
+              </Link>
             </div>
             
             <div className="flex items-center gap-4">
               {user && (
-                <div className="hidden md:flex items-center gap-2 text-sm text-neutral-600">
-                  <span>Hi, {user.name}</span>
+                <div className="hidden md:flex items-center gap-2 text-sm text-zinc-400">
+                  <span>Hola, {user.name}</span>
                 </div>
               )}
-              <Link to={createPageUrl("Admin")} className="hidden md:flex w-10 h-10 rounded-full hover:bg-neutral-100 items-center justify-center transition-colors">
-                <User className="w-5 h-5 text-neutral-600" />
+              <Link to={createPageUrl("Admin")} className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors" data-testid="nav-admin">
+                <Settings className="w-5 h-5 text-zinc-400" />
               </Link>
               <button
                 onClick={logout}
-                className="hidden md:flex w-10 h-10 rounded-full hover:bg-neutral-100 items-center justify-center transition-colors"
-                title="Logout"
+                className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors"
+                title="Cerrar sesión"
+                data-testid="logout-btn"
               >
-                <LogOut className="w-5 h-5 text-neutral-600" />
+                <LogOut className="w-5 h-5 text-zinc-400" />
               </button>
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="relative w-10 h-10 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors"
+                className="relative w-10 h-10 hover:bg-zinc-800 flex items-center justify-center transition-colors"
+                data-testid="cart-btn"
               >
-                <ShoppingBag className="w-5 h-5 text-neutral-600" />
+                <ShoppingBag className="w-5 h-5 text-zinc-400" />
                 {cartItems.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-600 text-white text-xs flex items-center justify-center font-bold" data-testid="cart-count">
                     {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
                   </span>
                 )}
               </button>
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden w-10 h-10 rounded-full hover:bg-neutral-100 flex items-center justify-center transition-colors"
+                className="md:hidden w-10 h-10 hover:bg-zinc-800 flex items-center justify-center transition-colors"
+                data-testid="mobile-menu-btn"
               >
-                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {isMobileMenuOpen ? <X className="w-5 h-5 text-white" /> : <Menu className="w-5 h-5 text-white" />}
               </button>
             </div>
           </div>
@@ -133,24 +149,25 @@ export default function Home() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-neutral-100 bg-white"
+              className="md:hidden border-t border-zinc-800 bg-zinc-900"
+              data-testid="mobile-menu"
             >
-              <div className="container mx-auto px-6 py-6 space-y-4">
+              <div className="px-4 py-6 space-y-4">
                 {user && (
-                  <div className="pb-2 border-b border-neutral-200">
-                    <p className="text-sm text-neutral-600">Signed in as</p>
-                    <p className="text-lg font-medium text-neutral-900">{user.name}</p>
+                  <div className="pb-4 border-b border-zinc-800">
+                    <p className="text-sm text-zinc-500">Conectado como</p>
+                    <p className="text-lg font-medium text-white">{user.name}</p>
                   </div>
                 )}
-                <Link to={createPageUrl("Shop")} className="block text-lg font-medium text-neutral-900">Shop</Link>
-                <a href="#" className="block text-lg font-medium text-neutral-900">Parts Catalog</a>
-                <a href="#" className="block text-lg font-medium text-neutral-900">Services</a>
-                <Link to={createPageUrl("Admin")} className="block text-lg font-medium text-neutral-900">Admin</Link>
+                <Link to={createPageUrl("Shop")} className="block text-lg font-medium text-white uppercase tracking-wider">Tienda</Link>
+                <Link to={createPageUrl("Shop") + "?sale_type=detal"} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Detal</Link>
+                <Link to={createPageUrl("Shop") + "?sale_type=mayor"} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Mayor</Link>
+                <Link to={createPageUrl("Admin")} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Admin</Link>
                 <button
                   onClick={logout}
-                  className="block text-lg font-medium text-red-600 w-full text-left"
+                  className="block text-lg font-medium text-red-500 w-full text-left uppercase tracking-wider"
                 >
-                  Logout
+                  Cerrar Sesión
                 </button>
               </div>
             </motion.div>
@@ -161,7 +178,7 @@ export default function Home() {
       <main className="pt-20">
         <HeroSection />
         <CategoryGrid />
-        <FeaturedProducts products={products} onAddToCart={addToCart} />
+        <FeaturedProducts products={products.filter(p => p.featured)} onAddToCart={addToCart} />
       </main>
       
       <Footer />
@@ -173,6 +190,8 @@ export default function Home() {
         onUpdateQuantity={updateCartQuantity}
         onRemove={removeFromCart}
       />
+      
+      <Chatbot />
     </div>
   );
 }
