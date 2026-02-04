@@ -574,6 +574,8 @@ async def add_to_cart(item: CartItemCreate):
     
     result = db.cart_items.insert_one(item_doc)
     item_doc["id"] = str(result.inserted_id)
+    if "_id" in item_doc:
+        del item_doc["_id"]
     
     return {"success": True, "item": item_doc}
 
