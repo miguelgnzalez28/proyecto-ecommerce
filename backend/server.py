@@ -3,31 +3,31 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from io import BytesIO
 import json
+import re
+import random
+import string
 
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, EmailStr
-from pymongo import MongoClient
 from passlib.context import CryptContext
 from jose import jwt, JWTError
-from bson import ObjectId
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
+from db_adapter import get_database, IS_VERCEL
+
 # Environment variables
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.environ.get("DB_NAME", "autoparts_ecommerce")
 JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "autoparts_secret_key_2024")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
-# MongoDB connection
-client = MongoClient(MONGO_URL)
-db = client[DB_NAME]
+# Database
+db = get_database()
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -77,7 +77,7 @@ class ProductCreate(BaseModel):
     category: str = "engine"
     inventory: int = 0
     featured: bool = False
-    sale_type: str = "both"  # detal, mayor, both
+    sale_type: str = "both"
     min_wholesale_qty: int = 10
 
 class ProductUpdate(BaseModel):
@@ -127,7 +127,7 @@ class OrderCreate(BaseModel):
     total: float
     shipping_address: ShippingAddress
     payment_method: str = "bank_transfer"
-    source: str = "web"  # web, mercadolibre, marketplace
+    source: str = "web"
     notes: str = ""
 
 class OrderUpdate(BaseModel):
@@ -136,7 +136,7 @@ class OrderUpdate(BaseModel):
     notes: Optional[str] = None
 
 class ExternalOrderCreate(BaseModel):
-    platform: str  # mercadolibre, marketplace
+    platform: str
     external_order_id: str
     customer_name: str
     customer_email: EmailStr = ""
@@ -187,21 +187,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
-def serialize_doc(doc):
-    """Convert MongoDB document to JSON serializable dict"""
-    if doc is None:
-        return None
-    doc["id"] = str(doc.pop("_id"))
-    return doc
-
 def get_now():
     return datetime.now(timezone.utc).isoformat()
 
+def generate_order_id(prefix: str = "ORD"):
+    return f"{prefix}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
+
 # ============== SEED DATA ==============
 
-def seed_initial_data():
+async def seed_initial_data():
+    """Seed initial data if collections are empty"""
+    
     # Seed products if empty
-    if db.products.count_documents({}) == 0:
+    product_count = await db.count_documents('products')
+    if product_count == 0:
         products = [
             {
                 "name": "Filtro de Aire Premium",
@@ -316,12 +315,13 @@ def seed_initial_data():
                 "updated_at": get_now()
             }
         ]
-        db.products.insert_many(products)
+        await db.insert_many('products', products)
         print("Initial products seeded")
 
     # Seed bank config if empty
-    if db.config.find_one({"type": "bank"}) is None:
-        db.config.insert_one({
+    bank_config = await db.find_one('config', {"type": "bank"})
+    if not bank_config:
+        await db.insert_one('config', {
             "type": "bank",
             "bank_name": "",
             "account_number": "",
@@ -333,8 +333,9 @@ def seed_initial_data():
         })
 
     # Seed company config if empty
-    if db.config.find_one({"type": "company"}) is None:
-        db.config.insert_one({
+    company_config = await db.find_one('config', {"type": "company"})
+    if not company_config:
+        await db.insert_one('config', {
             "type": "company",
             "name": "AutoParts Pro",
             "address": "",
@@ -347,7 +348,8 @@ def seed_initial_data():
         })
 
     # Seed chatbot responses if empty
-    if db.chatbot_responses.count_documents({}) == 0:
+    chatbot_count = await db.count_documents('chatbot_responses')
+    if chatbot_count == 0:
         responses = [
             {
                 "keywords": ["precio", "costo", "cuanto", "cuánto"],
@@ -365,67 +367,51 @@ def seed_initial_data():
             },
             {
                 "keywords": ["envio", "envío", "delivery", "entrega"],
-                "response": "Realizamos envíos a todo el país. El tiempo de entrega depende de tu ubicación. ¿Necesitas más información?",
+                "response": "Realizamos envíos a todo el país. El tiempo de entrega depende de tu ubicación.",
                 "redirect_whatsapp": True,
                 "active": True,
                 "created_at": get_now()
             },
             {
-                "keywords": ["pago", "transferencia", "deposito", "depósito"],
-                "response": "Aceptamos transferencias bancarias. Puedes ver los datos de nuestra cuenta en la sección de checkout.",
-                "redirect_whatsapp": False,
-                "active": True,
-                "created_at": get_now()
-            },
-            {
-                "keywords": ["hola", "buenos dias", "buenas tardes", "buenas noches", "saludos"],
+                "keywords": ["hola", "buenos dias", "buenas tardes", "saludos"],
                 "response": "¡Hola! Bienvenido a AutoParts Pro. ¿En qué podemos ayudarte hoy?",
                 "redirect_whatsapp": False,
                 "active": True,
                 "created_at": get_now()
             },
             {
-                "keywords": ["garantia", "garantía", "devolucion", "devolución"],
-                "response": "Todos nuestros productos tienen garantía. Para información sobre devoluciones, contacta a nuestro equipo.",
-                "redirect_whatsapp": True,
-                "active": True,
-                "created_at": get_now()
-            },
-            {
                 "keywords": ["mayorista", "mayor", "al mayor", "distribuidor"],
-                "response": "¡Tenemos precios especiales para mayoristas! Contacta a nuestro equipo comercial para más información.",
+                "response": "¡Tenemos precios especiales para mayoristas! Contacta a nuestro equipo comercial.",
                 "redirect_whatsapp": True,
                 "active": True,
                 "created_at": get_now()
             }
         ]
-        db.chatbot_responses.insert_many(responses)
+        await db.insert_many('chatbot_responses', responses)
         print("Initial chatbot responses seeded")
 
-# Run seed on startup
-seed_initial_data()
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    await seed_initial_data()
 
 # ============== AUTH ENDPOINTS ==============
 
 @app.post("/api/auth/register", response_model=TokenResponse)
 async def register(user: UserRegister):
-    # Validate name
-    import re
     name_regex = re.compile(r"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s'-]+$")
     if not name_regex.match(user.name):
-        raise HTTPException(status_code=400, detail="El nombre solo puede contener letras, espacios, guiones y apóstrofes")
+        raise HTTPException(status_code=400, detail="El nombre solo puede contener letras")
     if len(user.name.strip()) < 2:
         raise HTTPException(status_code=400, detail="El nombre debe tener al menos 2 caracteres")
     
-    # Check if email exists
-    if db.users.find_one({"email": user.email}):
+    existing = await db.find_one('users', {"email": user.email})
+    if existing:
         raise HTTPException(status_code=409, detail="El email ya está registrado")
     
-    # Validate password
     if len(user.password) < 6:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
-    # Create user
     user_doc = {
         "name": user.name,
         "email": user.email,
@@ -434,36 +420,34 @@ async def register(user: UserRegister):
         "created_at": get_now(),
         "updated_at": get_now()
     }
-    result = db.users.insert_one(user_doc)
+    result = await db.insert_one('users', user_doc)
     
     user_response = UserResponse(
-        id=str(result.inserted_id),
+        id=result['inserted_id'],
         name=user.name,
         email=user.email,
         role=user.role,
         created_at=user_doc["created_at"]
     )
     
-    token = create_access_token({"sub": user.email, "user_id": str(result.inserted_id)})
-    
+    token = create_access_token({"sub": user.email, "user_id": result['inserted_id']})
     return TokenResponse(access_token=token, user=user_response)
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
-    user = db.users.find_one({"email": credentials.email})
+    user = await db.find_one('users', {"email": credentials.email})
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Email o contraseña inválidos")
     
     user_response = UserResponse(
-        id=str(user["_id"]),
+        id=user.get('id', ''),
         name=user["name"],
         email=user["email"],
         role=user.get("role", "customer"),
         created_at=user.get("created_at", "")
     )
     
-    token = create_access_token({"sub": user["email"], "user_id": str(user["_id"])})
-    
+    token = create_access_token({"sub": user["email"], "user_id": user.get('id', '')})
     return TokenResponse(access_token=token, user=user_response)
 
 # ============== PRODUCTS ENDPOINTS ==============
@@ -477,24 +461,26 @@ async def get_products(
     query = {}
     if category and category != "all":
         query["category"] = category
-    if sale_type and sale_type != "all":
-        query["$or"] = [{"sale_type": sale_type}, {"sale_type": "both"}]
     if featured is not None:
         query["featured"] = featured
     
-    products = list(db.products.find(query).sort("created_at", -1))
-    return {"success": True, "products": [serialize_doc(p) for p in products]}
+    products = await db.find('products', query if query else None)
+    
+    # Filter by sale_type
+    if sale_type and sale_type != "all":
+        products = [p for p in products if p.get('sale_type') == sale_type or p.get('sale_type') == 'both']
+    
+    # Sort by created_at desc
+    products.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
+    return {"success": True, "products": products}
 
 @app.get("/api/products/{product_id}")
 async def get_product(product_id: str):
-    try:
-        product = db.products.find_one({"_id": ObjectId(product_id)})
-    except:
-        raise HTTPException(status_code=400, detail="ID de producto inválido")
-    
+    product = await db.find_one('products', {"id": product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    return {"success": True, "product": serialize_doc(product)}
+    return {"success": True, "product": product}
 
 @app.post("/api/products")
 async def create_product(product: ProductCreate):
@@ -502,121 +488,95 @@ async def create_product(product: ProductCreate):
     product_doc["created_at"] = get_now()
     product_doc["updated_at"] = get_now()
     
-    result = db.products.insert_one(product_doc)
-    product_doc["id"] = str(result.inserted_id)
-    if "_id" in product_doc:
-        del product_doc["_id"]
+    result = await db.insert_one('products', product_doc)
+    product_doc["id"] = result['inserted_id']
     
     return {"success": True, "product": product_doc}
 
 @app.put("/api/products/{product_id}")
 async def update_product(product_id: str, product: ProductUpdate):
-    try:
-        obj_id = ObjectId(product_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID de producto inválido")
-    
     update_data = {k: v for k, v in product.model_dump().items() if v is not None}
     update_data["updated_at"] = get_now()
     
-    result = db.products.update_one({"_id": obj_id}, {"$set": update_data})
-    if result.matched_count == 0:
+    result = await db.update_one('products', {"id": product_id}, {"$set": update_data})
+    if result['matched_count'] == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    updated = db.products.find_one({"_id": obj_id})
-    return {"success": True, "product": serialize_doc(updated)}
+    updated = await db.find_one('products', {"id": product_id})
+    return {"success": True, "product": updated}
 
 @app.delete("/api/products/{product_id}")
 async def delete_product(product_id: str):
-    try:
-        obj_id = ObjectId(product_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID de producto inválido")
-    
-    # Delete related cart items
-    db.cart_items.delete_many({"product_id": product_id})
-    
-    result = db.products.delete_one({"_id": obj_id})
-    if result.deleted_count == 0:
+    await db.delete_many('cart_items', {"product_id": product_id})
+    result = await db.delete_one('products', {"id": product_id})
+    if result['deleted_count'] == 0:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
     return {"success": True, "message": "Producto eliminado correctamente"}
 
 # ============== CART ENDPOINTS ==============
 
 @app.get("/api/cart")
 async def get_cart(session_id: str = Query(...)):
-    items = list(db.cart_items.find({"session_id": session_id}).sort("created_at", -1))
-    return {"success": True, "items": [serialize_doc(item) for item in items]}
+    items = await db.find('cart_items', {"session_id": session_id})
+    items.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return {"success": True, "items": items}
 
 @app.post("/api/cart")
 async def add_to_cart(item: CartItemCreate):
-    # Check if item already in cart
-    existing = db.cart_items.find_one({
+    items = await db.find('cart_items', {
         "session_id": item.session_id,
         "product_id": item.product_id,
         "sale_type": item.sale_type
     })
+    existing = items[0] if items else None
     
     if existing:
-        # Update quantity
         new_qty = existing["quantity"] + item.quantity
-        db.cart_items.update_one(
-            {"_id": existing["_id"]},
+        await db.update_one(
+            'cart_items',
+            {"id": existing["id"]},
             {"$set": {"quantity": new_qty, "updated_at": get_now()}}
         )
-        updated = db.cart_items.find_one({"_id": existing["_id"]})
-        return {"success": True, "item": serialize_doc(updated)}
+        updated = await db.find_one('cart_items', {"id": existing["id"]})
+        return {"success": True, "item": updated}
     
     item_doc = item.model_dump()
     item_doc["created_at"] = get_now()
     item_doc["updated_at"] = get_now()
     
-    result = db.cart_items.insert_one(item_doc)
-    item_doc["id"] = str(result.inserted_id)
-    if "_id" in item_doc:
-        del item_doc["_id"]
+    result = await db.insert_one('cart_items', item_doc)
+    item_doc["id"] = result['inserted_id']
     
     return {"success": True, "item": item_doc}
 
 @app.put("/api/cart/{item_id}")
 async def update_cart_item(item_id: str, update: CartItemUpdate):
-    try:
-        obj_id = ObjectId(item_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID de item inválido")
-    
     if update.quantity <= 0:
-        db.cart_items.delete_one({"_id": obj_id})
+        await db.delete_one('cart_items', {"id": item_id})
         return {"success": True, "message": "Item eliminado del carrito"}
     
-    result = db.cart_items.update_one(
-        {"_id": obj_id},
+    result = await db.update_one(
+        'cart_items',
+        {"id": item_id},
         {"$set": {"quantity": update.quantity, "updated_at": get_now()}}
     )
     
-    if result.matched_count == 0:
+    if result['matched_count'] == 0:
         raise HTTPException(status_code=404, detail="Item no encontrado")
     
-    updated = db.cart_items.find_one({"_id": obj_id})
-    return {"success": True, "item": serialize_doc(updated)}
+    updated = await db.find_one('cart_items', {"id": item_id})
+    return {"success": True, "item": updated}
 
 @app.delete("/api/cart/{item_id}")
 async def remove_from_cart(item_id: str):
-    try:
-        obj_id = ObjectId(item_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID de item inválido")
-    
-    result = db.cart_items.delete_one({"_id": obj_id})
-    if result.deleted_count == 0:
+    result = await db.delete_one('cart_items', {"id": item_id})
+    if result['deleted_count'] == 0:
         raise HTTPException(status_code=404, detail="Item no encontrado")
-    
     return {"success": True, "message": "Item eliminado del carrito"}
 
 @app.delete("/api/cart/session/{session_id}")
 async def clear_cart(session_id: str):
-    db.cart_items.delete_many({"session_id": session_id})
+    await db.delete_many('cart_items', {"session_id": session_id})
     return {"success": True, "message": "Carrito vaciado"}
 
 # ============== ORDERS ENDPOINTS ==============
@@ -635,30 +595,24 @@ async def get_orders(
     if source:
         query["source"] = source
     
-    orders = list(db.orders.find(query).sort("created_at", -1))
-    return {"success": True, "orders": [serialize_doc(o) for o in orders]}
+    orders = await db.find('orders', query if query else None)
+    orders.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return {"success": True, "orders": orders}
 
 @app.get("/api/orders/{order_id}")
 async def get_order(order_id: str):
-    order = db.orders.find_one({"order_id": order_id})
+    order = await db.find_one('orders', {"order_id": order_id})
     if not order:
-        try:
-            order = db.orders.find_one({"_id": ObjectId(order_id)})
-        except:
-            pass
+        order = await db.find_one('orders', {"id": order_id})
     
     if not order:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    return {"success": True, "order": serialize_doc(order)}
+    return {"success": True, "order": order}
 
 @app.post("/api/orders")
 async def create_order(order: OrderCreate):
-    import random
-    import string
-    
-    # Generate order ID
-    order_id = f"ORD-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
+    order_id = generate_order_id("ORD")
     
     order_doc = order.model_dump()
     order_doc["order_id"] = order_id
@@ -667,21 +621,25 @@ async def create_order(order: OrderCreate):
     order_doc["created_at"] = get_now()
     order_doc["updated_at"] = get_now()
     
-    result = db.orders.insert_one(order_doc)
-    order_doc["id"] = str(result.inserted_id)
-    if "_id" in order_doc:
-        del order_doc["_id"]
+    # Convert shipping_address to dict if it's a model
+    if hasattr(order_doc.get('shipping_address'), 'model_dump'):
+        order_doc['shipping_address'] = order_doc['shipping_address'].model_dump()
+    
+    # Convert items to dicts
+    order_doc['items'] = [
+        item.model_dump() if hasattr(item, 'model_dump') else item 
+        for item in order_doc.get('items', [])
+    ]
+    
+    result = await db.insert_one('orders', order_doc)
+    order_doc["id"] = result['inserted_id']
     
     return {"success": True, "order": order_doc}
 
 @app.post("/api/orders/external")
 async def create_external_order(order: ExternalOrderCreate):
-    import random
-    import string
-    
-    # Generate order ID
     prefix = "ML" if order.platform == "mercadolibre" else "MP"
-    order_id = f"{prefix}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.ascii_uppercase + string.digits, k=6))}"
+    order_id = generate_order_id(prefix)
     
     order_doc = order.model_dump()
     order_doc["order_id"] = order_id
@@ -691,22 +649,22 @@ async def create_external_order(order: ExternalOrderCreate):
     order_doc["created_at"] = get_now()
     order_doc["updated_at"] = get_now()
     
-    result = db.orders.insert_one(order_doc)
-    order_doc["id"] = str(result.inserted_id)
-    if "_id" in order_doc:
-        del order_doc["_id"]
+    # Convert items to dicts
+    order_doc['items'] = [
+        item.model_dump() if hasattr(item, 'model_dump') else item 
+        for item in order_doc.get('items', [])
+    ]
+    
+    result = await db.insert_one('orders', order_doc)
+    order_doc["id"] = result['inserted_id']
     
     return {"success": True, "order": order_doc}
 
 @app.put("/api/orders/{order_id}")
 async def update_order(order_id: str, update: OrderUpdate):
-    # Try to find by order_id first
-    order = db.orders.find_one({"order_id": order_id})
+    order = await db.find_one('orders', {"order_id": order_id})
     if not order:
-        try:
-            order = db.orders.find_one({"_id": ObjectId(order_id)})
-        except:
-            pass
+        order = await db.find_one('orders', {"id": order_id})
     
     if not order:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
@@ -714,31 +672,25 @@ async def update_order(order_id: str, update: OrderUpdate):
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     update_data["updated_at"] = get_now()
     
-    db.orders.update_one({"_id": order["_id"]}, {"$set": update_data})
+    await db.update_one('orders', {"id": order["id"]}, {"$set": update_data})
     
-    updated = db.orders.find_one({"_id": order["_id"]})
-    return {"success": True, "order": serialize_doc(updated)}
+    updated = await db.find_one('orders', {"id": order["id"]})
+    return {"success": True, "order": updated}
 
 # ============== PDF GENERATION ==============
 
 @app.get("/api/orders/{order_id}/pdf")
 async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
-    # Find order
-    order = db.orders.find_one({"order_id": order_id})
+    order = await db.find_one('orders', {"order_id": order_id})
     if not order:
-        try:
-            order = db.orders.find_one({"_id": ObjectId(order_id)})
-        except:
-            pass
+        order = await db.find_one('orders', {"id": order_id})
     
     if not order:
         raise HTTPException(status_code=404, detail="Pedido no encontrado")
     
-    # Get company config
-    company = db.config.find_one({"type": "company"}) or {}
-    bank = db.config.find_one({"type": "bank"}) or {}
+    company = await db.find_one('config', {"type": "company"}) or {}
+    bank = await db.find_one('config', {"type": "bank"}) or {}
     
-    # Create PDF
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
     
@@ -749,7 +701,6 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
     
     elements = []
     
-    # Header
     company_name = company.get("name", "AutoParts Pro")
     elements.append(Paragraph(company_name, title_style))
     
@@ -762,15 +713,13 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
     
     elements.append(Spacer(1, 0.3*inch))
     
-    # Document type
     doc_title = "TICKET DE COMPRA" if doc_type == "ticket" else "NOTA DE ENTREGA"
     elements.append(Paragraph(doc_title, title_style))
-    elements.append(Paragraph(f"Nº de Pedido: {order.get('order_id', str(order['_id']))}", bold_style))
+    elements.append(Paragraph(f"Nº de Pedido: {order.get('order_id', order.get('id', ''))}", bold_style))
     elements.append(Paragraph(f"Fecha: {order.get('created_at', '')[:10]}", normal_style))
     
     elements.append(Spacer(1, 0.2*inch))
     
-    # Customer info
     elements.append(Paragraph("DATOS DEL CLIENTE", bold_style))
     elements.append(Paragraph(f"Nombre: {order.get('customer_name', '')}", normal_style))
     elements.append(Paragraph(f"Email: {order.get('customer_email', '')}", normal_style))
@@ -781,31 +730,32 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
     if shipping:
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph("DIRECCIÓN DE ENVÍO", bold_style))
-        address_parts = [
-            shipping.get('street', ''),
-            shipping.get('city', ''),
-            shipping.get('state', ''),
-            shipping.get('zip', ''),
-            shipping.get('country', '')
-        ]
-        elements.append(Paragraph(", ".join([p for p in address_parts if p]), normal_style))
+        if isinstance(shipping, dict):
+            address_parts = [
+                shipping.get('street', ''),
+                shipping.get('city', ''),
+                shipping.get('state', ''),
+                shipping.get('zip', ''),
+                shipping.get('country', '')
+            ]
+            elements.append(Paragraph(", ".join([p for p in address_parts if p]), normal_style))
     
     elements.append(Spacer(1, 0.2*inch))
     
-    # Products table
     elements.append(Paragraph("PRODUCTOS", bold_style))
     
     items = order.get('items', [])
     table_data = [['Producto', 'Tipo', 'Cant.', 'Precio', 'Subtotal']]
     for item in items:
-        subtotal = item.get('price', 0) * item.get('quantity', 1)
-        table_data.append([
-            item.get('product_name', ''),
-            item.get('sale_type', 'detal').capitalize(),
-            str(item.get('quantity', 1)),
-            f"${item.get('price', 0):.2f}",
-            f"${subtotal:.2f}"
-        ])
+        if isinstance(item, dict):
+            subtotal = item.get('price', 0) * item.get('quantity', 1)
+            table_data.append([
+                item.get('product_name', ''),
+                item.get('sale_type', 'detal').capitalize(),
+                str(item.get('quantity', 1)),
+                f"${item.get('price', 0):.2f}",
+                f"${subtotal:.2f}"
+            ])
     
     table_data.append(['', '', '', 'TOTAL:', f"${order.get('total', 0):.2f}"])
     
@@ -824,7 +774,6 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
     
     elements.append(Spacer(1, 0.2*inch))
     
-    # Payment info
     elements.append(Paragraph("INFORMACIÓN DE PAGO", bold_style))
     elements.append(Paragraph(f"Método: {order.get('payment_method', 'Transferencia bancaria')}", normal_style))
     elements.append(Paragraph(f"Estado: {order.get('payment_status', 'pendiente').upper()}", normal_style))
@@ -839,14 +788,12 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
         if bank.get('identification'):
             elements.append(Paragraph(f"Cédula/RIF: {bank.get('identification')}", normal_style))
     
-    # Source info
     if order.get('source') and order.get('source') != 'web':
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph(f"Origen del pedido: {order.get('source').upper()}", normal_style))
         if order.get('external_order_id'):
             elements.append(Paragraph(f"ID Externo: {order.get('external_order_id')}", normal_style))
     
-    # Notes
     if order.get('notes'):
         elements.append(Spacer(1, 0.1*inch))
         elements.append(Paragraph("NOTAS", bold_style))
@@ -866,103 +813,81 @@ async def generate_order_pdf(order_id: str, doc_type: str = "ticket"):
 
 @app.get("/api/config/bank")
 async def get_bank_config():
-    config = db.config.find_one({"type": "bank"})
-    if config:
-        config = serialize_doc(config)
+    config = await db.find_one('config', {"type": "bank"})
     return {"success": True, "config": config or {}}
 
 @app.put("/api/config/bank")
 async def update_bank_config(config: BankConfigUpdate):
     update_data = config.model_dump()
     update_data["updated_at"] = get_now()
+    update_data["type"] = "bank"
     
-    db.config.update_one(
-        {"type": "bank"},
-        {"$set": update_data},
-        upsert=True
-    )
+    await db.update_one('config', {"type": "bank"}, {"$set": update_data}, upsert=True)
     
-    updated = db.config.find_one({"type": "bank"})
-    return {"success": True, "config": serialize_doc(updated)}
+    updated = await db.find_one('config', {"type": "bank"})
+    return {"success": True, "config": updated}
 
 @app.get("/api/config/company")
 async def get_company_config():
-    config = db.config.find_one({"type": "company"})
-    if config:
-        config = serialize_doc(config)
+    config = await db.find_one('config', {"type": "company"})
     return {"success": True, "config": config or {}}
 
 @app.put("/api/config/company")
 async def update_company_config(config: CompanyConfigUpdate):
     update_data = config.model_dump()
     update_data["updated_at"] = get_now()
+    update_data["type"] = "company"
     
-    db.config.update_one(
-        {"type": "company"},
-        {"$set": update_data},
-        upsert=True
-    )
+    await db.update_one('config', {"type": "company"}, {"$set": update_data}, upsert=True)
     
-    updated = db.config.find_one({"type": "company"})
-    return {"success": True, "config": serialize_doc(updated)}
+    updated = await db.find_one('config', {"type": "company"})
+    return {"success": True, "config": updated}
 
 # ============== CHATBOT ENDPOINTS ==============
 
 @app.get("/api/chatbot/responses")
 async def get_chatbot_responses():
-    responses = list(db.chatbot_responses.find().sort("created_at", -1))
-    return {"success": True, "responses": [serialize_doc(r) for r in responses]}
+    responses = await db.find('chatbot_responses')
+    responses.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return {"success": True, "responses": responses}
 
 @app.post("/api/chatbot/responses")
 async def create_chatbot_response(response: ChatbotResponseCreate):
     doc = response.model_dump()
     doc["created_at"] = get_now()
     
-    result = db.chatbot_responses.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
+    result = await db.insert_one('chatbot_responses', doc)
+    doc["id"] = result['inserted_id']
     
     return {"success": True, "response": doc}
 
 @app.put("/api/chatbot/responses/{response_id}")
 async def update_chatbot_response(response_id: str, response: ChatbotResponseCreate):
-    try:
-        obj_id = ObjectId(response_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID inválido")
-    
     update_data = response.model_dump()
     update_data["updated_at"] = get_now()
     
-    result = db.chatbot_responses.update_one({"_id": obj_id}, {"$set": update_data})
-    if result.matched_count == 0:
+    result = await db.update_one('chatbot_responses', {"id": response_id}, {"$set": update_data})
+    if result['matched_count'] == 0:
         raise HTTPException(status_code=404, detail="Respuesta no encontrada")
     
-    updated = db.chatbot_responses.find_one({"_id": obj_id})
-    return {"success": True, "response": serialize_doc(updated)}
+    updated = await db.find_one('chatbot_responses', {"id": response_id})
+    return {"success": True, "response": updated}
 
 @app.delete("/api/chatbot/responses/{response_id}")
 async def delete_chatbot_response(response_id: str):
-    try:
-        obj_id = ObjectId(response_id)
-    except:
-        raise HTTPException(status_code=400, detail="ID inválido")
-    
-    result = db.chatbot_responses.delete_one({"_id": obj_id})
-    if result.deleted_count == 0:
+    result = await db.delete_one('chatbot_responses', {"id": response_id})
+    if result['deleted_count'] == 0:
         raise HTTPException(status_code=404, detail="Respuesta no encontrada")
-    
     return {"success": True, "message": "Respuesta eliminada"}
 
 @app.post("/api/chatbot/query")
 async def query_chatbot(message: dict):
     user_message = message.get("message", "").lower()
     
-    # Get company config for WhatsApp number
-    company = db.config.find_one({"type": "company"}) or {}
+    company = await db.find_one('config', {"type": "company"}) or {}
     whatsapp = company.get("whatsapp_number", "")
     
-    # Find matching response
-    responses = list(db.chatbot_responses.find({"active": True}))
+    responses = await db.find('chatbot_responses', {"active": True})
     
     for resp in responses:
         keywords = resp.get("keywords", [])
@@ -974,10 +899,9 @@ async def query_chatbot(message: dict):
                 "whatsapp_number": whatsapp if resp.get("redirect_whatsapp") else ""
             }
     
-    # Default response
     return {
         "success": True,
-        "response": "No entendí tu consulta. ¿Podrías ser más específico? También puedes contactar a nuestro equipo de ventas directamente.",
+        "response": "No entendí tu consulta. ¿Podrías ser más específico?",
         "redirect_whatsapp": True,
         "whatsapp_number": whatsapp
     }
@@ -986,21 +910,22 @@ async def query_chatbot(message: dict):
 
 @app.get("/api/subscribers")
 async def get_subscribers():
-    subscribers = list(db.subscribers.find().sort("created_at", -1))
-    return {"success": True, "subscribers": [serialize_doc(s) for s in subscribers]}
+    subscribers = await db.find('subscribers')
+    subscribers.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    return {"success": True, "subscribers": subscribers}
 
 @app.post("/api/subscribers")
 async def create_subscriber(subscriber: SubscriberCreate):
-    # Check if already subscribed
-    if db.subscribers.find_one({"email": subscriber.email}):
+    existing = await db.find_one('subscribers', {"email": subscriber.email})
+    if existing:
         return {"success": True, "message": "Ya estás suscrito"}
     
     doc = subscriber.model_dump()
     doc["is_active"] = True
     doc["created_at"] = get_now()
     
-    result = db.subscribers.insert_one(doc)
-    doc["id"] = str(result.inserted_id)
+    result = await db.insert_one('subscribers', doc)
+    doc["id"] = result['inserted_id']
     
     return {"success": True, "subscriber": doc}
 
@@ -1008,27 +933,23 @@ async def create_subscriber(subscriber: SubscriberCreate):
 
 @app.get("/api/stats")
 async def get_stats():
-    total_products = db.products.count_documents({})
-    total_orders = db.orders.count_documents({})
-    total_subscribers = db.subscribers.count_documents({"is_active": True})
+    total_products = await db.count_documents('products')
+    total_orders = await db.count_documents('orders')
+    total_subscribers = await db.count_documents('subscribers', {"is_active": True})
     
     # Calculate revenue
-    pipeline = [
-        {"$match": {"payment_status": "paid"}},
-        {"$group": {"_id": None, "total": {"$sum": "$total"}}}
-    ]
-    revenue_result = list(db.orders.aggregate(pipeline))
-    total_revenue = revenue_result[0]["total"] if revenue_result else 0
+    paid_orders = await db.find('orders', {"payment_status": "paid"})
+    total_revenue = sum(o.get('total', 0) for o in paid_orders)
     
     # Orders by status
     orders_by_status = {}
     for status in ["pending", "paid", "shipped", "delivered", "cancelled"]:
-        orders_by_status[status] = db.orders.count_documents({"status": status})
+        orders_by_status[status] = await db.count_documents('orders', {"status": status})
     
     # Orders by source
     orders_by_source = {}
     for source in ["web", "mercadolibre", "marketplace"]:
-        orders_by_source[source] = db.orders.count_documents({"source": source})
+        orders_by_source[source] = await db.count_documents('orders', {"source": source})
     
     return {
         "success": True,
@@ -1042,40 +963,6 @@ async def get_stats():
         }
     }
 
-# ============== REPORTS ENDPOINTS ==============
-
-@app.get("/api/reports/sales")
-async def get_sales_report(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None
-):
-    query = {}
-    if start_date:
-        query["created_at"] = {"$gte": start_date}
-    if end_date:
-        if "created_at" in query:
-            query["created_at"]["$lte"] = end_date
-        else:
-            query["created_at"] = {"$lte": end_date}
-    
-    orders = list(db.orders.find(query).sort("created_at", -1))
-    
-    total_sales = sum(o.get("total", 0) for o in orders if o.get("payment_status") == "paid")
-    total_orders = len(orders)
-    paid_orders = len([o for o in orders if o.get("payment_status") == "paid"])
-    pending_orders = len([o for o in orders if o.get("payment_status") == "pending"])
-    
-    return {
-        "success": True,
-        "report": {
-            "total_sales": total_sales,
-            "total_orders": total_orders,
-            "paid_orders": paid_orders,
-            "pending_orders": pending_orders,
-            "orders": [serialize_doc(o) for o in orders]
-        }
-    }
-
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": get_now()}
+    return {"status": "healthy", "timestamp": get_now(), "database": "vercel_blob" if IS_VERCEL else "mongodb"}
