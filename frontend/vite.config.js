@@ -13,11 +13,7 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     strictPort: true,
-    allowedHosts: [
-      'localhost',
-      '127.0.0.1',
-      '.preview.emergentagent.com'
-    ],
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8001',
