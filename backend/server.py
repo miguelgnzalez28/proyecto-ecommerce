@@ -53,7 +53,7 @@ class UserRegister(BaseModel):
     role: str = "customer"
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str  # Can be email or username
     password: str
 
 class UserResponse(BaseModel):
