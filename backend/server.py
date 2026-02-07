@@ -435,7 +435,13 @@ async def register(user: UserRegister):
 
 @app.post("/api/auth/login", response_model=TokenResponse)
 async def login(credentials: UserLogin):
+    # Try to find by email first, then by name/username
     user = await db.find_one('users', {"email": credentials.email})
+    
+    # If not found by email, check if it's the admin username shortcut
+    if not user and credentials.email.lower() == 'admin':
+        user = await db.find_one('users', {"role": "admin"})
+    
     if not user or not verify_password(credentials.password, user["password"]):
         raise HTTPException(status_code=401, detail="Email o contraseña inválidos")
     
