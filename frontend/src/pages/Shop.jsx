@@ -194,7 +194,9 @@ export default function Shop() {
                 <Link to={createPageUrl('Shop')} className="block text-lg font-medium text-white uppercase tracking-wider">Tienda</Link>
                 <Link to={createPageUrl('Shop') + '?sale_type=detal'} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Detal</Link>
                 <Link to={createPageUrl('Shop') + '?sale_type=mayor'} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Mayor</Link>
-                <Link to={createPageUrl('Admin')} className="block text-lg font-medium text-zinc-400 uppercase tracking-wider">Admin</Link>
+                {isAdmin() && (
+                  <Link to={createPageUrl('Admin')} className="block text-lg font-medium text-red-500 uppercase tracking-wider">Admin</Link>
+                )}
               </div>
             </motion.div>
           )}
