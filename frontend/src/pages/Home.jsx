@@ -106,11 +106,16 @@ export default function Home() {
               {user && (
                 <div className="hidden md:flex items-center gap-2 text-sm text-zinc-400">
                   <span>Hola, {user.name}</span>
+                  {isAdmin() && (
+                    <span className="px-2 py-0.5 bg-red-600/20 text-red-500 text-xs font-bold uppercase">Admin</span>
+                  )}
                 </div>
               )}
-              <Link to={createPageUrl("Admin")} className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors" data-testid="nav-admin">
-                <Settings className="w-5 h-5 text-zinc-400" />
-              </Link>
+              {isAdmin() && (
+                <Link to={createPageUrl("Admin")} className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors" data-testid="nav-admin">
+                  <Settings className="w-5 h-5 text-zinc-400" />
+                </Link>
+              )}
               <button
                 onClick={logout}
                 className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors"
