@@ -149,9 +149,11 @@ export default function Shop() {
             </div>
 
             <div className="flex items-center gap-4">
-              <Link to={createPageUrl('Admin')} className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors">
-                <Settings className="w-5 h-5 text-zinc-400" />
-              </Link>
+              {isAdmin() && (
+                <Link to={createPageUrl('Admin')} className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors">
+                  <Settings className="w-5 h-5 text-zinc-400" />
+                </Link>
+              )}
               <button
                 onClick={logout}
                 className="hidden md:flex w-10 h-10 hover:bg-zinc-800 items-center justify-center transition-colors"
