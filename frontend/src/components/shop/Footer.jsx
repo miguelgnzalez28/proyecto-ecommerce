@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import NewsletterForm from './NewsletterForm';
 import { Phone, Mail, MapPin, Facebook, Instagram, Twitter } from 'lucide-react';
+import { useAuth } from '@/lib/AuthContext';
 
 export default function Footer() {
+  const { isAdmin } = useAuth();
+  
   return (
     <footer className="bg-zinc-950 border-t border-zinc-800" data-testid="footer">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
