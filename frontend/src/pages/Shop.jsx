@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/AuthContext';
 
 export default function Shop() {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('category') || 'all';
   const initialSaleType = searchParams.get('sale_type') || 'all';
