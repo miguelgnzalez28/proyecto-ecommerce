@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/AuthContext";
 
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [sessionId] = useState(() => localStorage.getItem('session_id') || `session_${Date.now()}`);
