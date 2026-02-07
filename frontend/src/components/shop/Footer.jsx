@@ -59,11 +59,13 @@ export default function Footer() {
                   Venta al Mayor
                 </Link>
               </li>
-              <li>
-                <Link to={createPageUrl('Admin')} className="text-zinc-500 hover:text-white transition-colors text-sm">
-                  Mi Cuenta
-                </Link>
-              </li>
+              {isAdmin && isAdmin() && (
+                <li>
+                  <Link to={createPageUrl('Admin')} className="text-zinc-500 hover:text-white transition-colors text-sm">
+                    Panel Admin
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
 
