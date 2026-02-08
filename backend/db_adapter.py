@@ -7,7 +7,13 @@ import json
 import httpx
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
-from bson import ObjectId
+
+# Only import ObjectId if pymongo is available (for MongoDB wrapper)
+try:
+    from bson import ObjectId
+except ImportError:
+    # ObjectId is only used in MongoDBWrapper, not in VercelBlobDB
+    ObjectId = None
 
 # Check if running on Vercel
 IS_VERCEL = os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV')
@@ -341,16 +347,20 @@ class MongoDBWrapper:
     
     async def find_one(self, collection: str, query: Dict) -> Optional[Dict]:
         # Handle both string ID and ObjectId
-        if 'id' in query:
-            try:
-                query['_id'] = ObjectId(query.pop('id'))
-            except:
-                pass
-        if '_id' in query and isinstance(query['_id'], str):
-            try:
-                query['_id'] = ObjectId(query['_id'])
-            except:
-                pass
+        if ObjectId is None:
+            # pymongo not available, skip ObjectId conversion
+            pass
+        else:
+            if 'id' in query:
+                try:
+                    query['_id'] = ObjectId(query.pop('id'))
+                except:
+                    pass
+            if '_id' in query and isinstance(query['_id'], str):
+                try:
+                    query['_id'] = ObjectId(query['_id'])
+                except:
+                    pass
                 
         doc = self.db[collection].find_one(query)
         if doc:
@@ -367,16 +377,17 @@ class MongoDBWrapper:
     
     async def update_one(self, collection: str, query: Dict, update: Dict, upsert: bool = False) -> Dict:
         # Handle ID conversion
-        if 'id' in query:
-            try:
-                query['_id'] = ObjectId(query.pop('id'))
-            except:
-                pass
-        if '_id' in query and isinstance(query['_id'], str):
-            try:
-                query['_id'] = ObjectId(query['_id'])
-            except:
-                pass
+        if ObjectId is not None:
+            if 'id' in query:
+                try:
+                    query['_id'] = ObjectId(query.pop('id'))
+                except:
+                    pass
+            if '_id' in query and isinstance(query['_id'], str):
+                try:
+                    query['_id'] = ObjectId(query['_id'])
+                except:
+                    pass
                 
         result = self.db[collection].update_one(query, update, upsert=upsert)
         return {
@@ -386,16 +397,17 @@ class MongoDBWrapper:
         }
     
     async def delete_one(self, collection: str, query: Dict) -> Dict:
-        if 'id' in query:
-            try:
-                query['_id'] = ObjectId(query.pop('id'))
-            except:
-                pass
-        if '_id' in query and isinstance(query['_id'], str):
-            try:
-                query['_id'] = ObjectId(query['_id'])
-            except:
-                pass
+        if ObjectId is not None:
+            if 'id' in query:
+                try:
+                    query['_id'] = ObjectId(query.pop('id'))
+                except:
+                    pass
+            if '_id' in query and isinstance(query['_id'], str):
+                try:
+                    query['_id'] = ObjectId(query['_id'])
+                except:
+                    pass
                 
         result = self.db[collection].delete_one(query)
         return {'deleted_count': result.deleted_count}
