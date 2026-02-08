@@ -85,16 +85,24 @@ class VercelBlobDB:
         try:
             filename = f"db/{collection}.json"
             json_data = json.dumps(data, ensure_ascii=False, default=str)
+            json_bytes = json_data.encode('utf-8')
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Use POST with multipart/form-data for Vercel Blob Storage API
-                # The API expects 'file' field with the content and 'pathname' for the filename
+                # Vercel Blob Storage API REST format
+                # POST to https://blob.vercel-storage.com
+                # multipart/form-data with:
+                #   - pathname: the file path (string)
+                #   - file: the file content (bytes)
+                #   - access: 'public' or 'private' (string)
+                # This mimics: put('pathname', 'content', { access: 'public' })
+                
+                # Use httpx multipart form data
                 files = {
-                    'file': (filename, json_data.encode('utf-8'), 'application/json')
+                    'file': (filename, json_bytes, 'application/json')
                 }
                 form_data = {
                     'pathname': filename,
-                    'addRandomSuffix': 'false'
+                    'access': 'public'
                 }
                 
                 response = await client.post(
