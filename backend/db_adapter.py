@@ -17,14 +17,17 @@ class VercelBlobDB:
     """Database adapter using Vercel Blob Storage"""
     
     def __init__(self):
-        self.token = BLOB_READ_WRITE_TOKEN
+        # Read token from environment variable
+        self.token = os.environ.get('BLOB_READ_WRITE_TOKEN', '')
         self.base_url = "https://blob.vercel-storage.com"
         self.cache = {}  # In-memory cache for current request
         
         if not self.token:
             print("WARNING: BLOB_READ_WRITE_TOKEN is not set! Blob storage will not work.")
+            print(f"Available env vars: VERCEL={os.environ.get('VERCEL')}, VERCEL_ENV={os.environ.get('VERCEL_ENV')}")
         else:
-            print(f"VercelBlobDB initialized with token: {self.token[:10]}...")
+            print(f"VercelBlobDB initialized with token: {self.token[:20]}...")
+            print(f"Token length: {len(self.token)}")
         
     def _get_headers(self):
         return {
