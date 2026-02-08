@@ -104,9 +104,10 @@ class VercelBlobDB:
                 #   - access: 'public' or 'private' (string)
                 
                 # Create multipart form data
-                # Note: httpx will automatically set Content-Type to multipart/form-data
+                # httpx will automatically set Content-Type to multipart/form-data with boundary
+                # Format: (filename, content, content_type)
                 files = {
-                    'file': (filename, json_data, 'application/json')
+                    'file': (filename, json_data.encode('utf-8'), 'application/json')
                 }
                 form_data = {
                     'pathname': filename,
@@ -115,6 +116,8 @@ class VercelBlobDB:
                 
                 print(f"Attempting to save blob: {filename}")
                 print(f"Token present: {bool(self.token)}")
+                print(f"Token prefix: {self.token[:20] if self.token else 'N/A'}...")
+                print(f"Data size: {len(json_data)} bytes")
                 
                 response = await client.post(
                     f"{self.base_url}",
