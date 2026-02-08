@@ -198,6 +198,20 @@ def generate_order_id(prefix: str = "ORD"):
 async def seed_initial_data():
     """Seed initial data if collections are empty"""
     
+    # Seed admin user if no admin exists
+    admin_user = await db.find_one('users', {"role": "admin"})
+    if not admin_user:
+        admin_doc = {
+            "name": "Administrador",
+            "email": "admin@autoparts.com",
+            "password": hash_password("123456789"),
+            "role": "admin",
+            "created_at": get_now(),
+            "updated_at": get_now()
+        }
+        await db.insert_one('users', admin_doc)
+        print("Admin user seeded: username='admin', password='123456789'")
+    
     # Seed products if empty
     product_count = await db.count_documents('products')
     if product_count == 0:
