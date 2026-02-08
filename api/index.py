@@ -1,4 +1,4 @@
-"""Vercel entrypoint for FastAPI - Simple function approach"""
+"""Vercel entrypoint for FastAPI"""
 import os
 import sys
 
@@ -6,8 +6,9 @@ import sys
 backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
 sys.path.insert(0, backend_path)
 
-# Import app after path is set
+# Import and export FastAPI app directly
+# Vercel supports FastAPI natively and will handle ASGI automatically
 from server import app
 
-# Vercel may support ASGI apps directly if exported as 'app'
-# If this doesn't work, we'll need to use Railway or Render instead
+# Export the app - Vercel will detect it as an ASGI application
+# No need for Mangum or wrapper functions
