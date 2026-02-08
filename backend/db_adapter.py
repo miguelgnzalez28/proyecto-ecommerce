@@ -21,6 +21,11 @@ class VercelBlobDB:
         self.base_url = "https://blob.vercel-storage.com"
         self.cache = {}  # In-memory cache for current request
         
+        if not self.token:
+            print("WARNING: BLOB_READ_WRITE_TOKEN is not set! Blob storage will not work.")
+        else:
+            print(f"VercelBlobDB initialized with token: {self.token[:10]}...")
+        
     def _get_headers(self):
         return {
             "Authorization": f"Bearer {self.token}",
@@ -83,27 +88,33 @@ class VercelBlobDB:
     async def _save_blob(self, collection: str, data: List[Dict]):
         """Save collection data to Vercel Blob"""
         try:
+            if not self.token:
+                print(f"ERROR: BLOB_READ_WRITE_TOKEN is not set!")
+                return False
+                
             filename = f"db/{collection}.json"
             json_data = json.dumps(data, ensure_ascii=False, default=str)
-            json_bytes = json_data.encode('utf-8')
             
             async with httpx.AsyncClient(timeout=30.0) as client:
                 # Vercel Blob Storage API REST format
-                # POST to https://blob.vercel-storage.com
-                # multipart/form-data with:
+                # Based on: put('pathname', 'content', { access: 'public' })
+                # The API expects multipart/form-data with:
                 #   - pathname: the file path (string)
-                #   - file: the file content (bytes)
+                #   - file: the file content (as string or bytes)
                 #   - access: 'public' or 'private' (string)
-                # This mimics: put('pathname', 'content', { access: 'public' })
                 
-                # Use httpx multipart form data
+                # Create multipart form data
+                # Note: httpx will automatically set Content-Type to multipart/form-data
                 files = {
-                    'file': (filename, json_bytes, 'application/json')
+                    'file': (filename, json_data, 'application/json')
                 }
                 form_data = {
                     'pathname': filename,
                     'access': 'public'
                 }
+                
+                print(f"Attempting to save blob: {filename}")
+                print(f"Token present: {bool(self.token)}")
                 
                 response = await client.post(
                     f"{self.base_url}",
@@ -114,21 +125,41 @@ class VercelBlobDB:
                     data=form_data
                 )
                 
+                print(f"Response status: {response.status_code}")
+                print(f"Response headers: {dict(response.headers)}")
+                
                 if response.status_code in [200, 201]:
-                    self.cache[collection] = data
-                    return True
+                    try:
+                        response_data = response.json()
+                        print(f"Blob saved successfully: {response_data}")
+                        self.cache[collection] = data
+                        return True
+                    except:
+                        # If response is not JSON, still consider it success if status is 200/201
+                        self.cache[collection] = data
+                        return True
                 else:
                     error_text = response.text if hasattr(response, 'text') else str(response.content)
-                    print(f"Error saving blob {collection}: {response.status_code} - {error_text}")
+                    print(f"ERROR saving blob {collection}:")
+                    print(f"  Status: {response.status_code}")
+                    print(f"  Response: {error_text}")
                     # Try to get more details from response
                     try:
                         error_json = response.json()
-                        print(f"Error details: {error_json}")
+                        print(f"  Error JSON: {error_json}")
                     except:
                         pass
                     return False
+        except httpx.TimeoutException as e:
+            print(f"Timeout error saving blob {collection}: {e}")
+            return False
+        except httpx.RequestError as e:
+            print(f"Request error saving blob {collection}: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
         except Exception as e:
-            print(f"Error saving blob {collection}: {e}")
+            print(f"Unexpected error saving blob {collection}: {e}")
             import traceback
             traceback.print_exc()
             return False
