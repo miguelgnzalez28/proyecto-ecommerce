@@ -3,7 +3,7 @@ Vercel Serverless Function Handler for FastAPI
 """
 import sys
 import os
-import json
+import asyncio
 
 # Add backend directory to path
 backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
@@ -16,17 +16,22 @@ from mangum import Mangum
 adapter = Mangum(app, lifespan="off")
 
 # Vercel Python serverless function handler
-# Must be a function that accepts (event, context) or just (event)
-async def handler(event, context=None):
+# Vercel expects a synchronous function that can handle async internally
+def handler(event, context=None):
     """
     Vercel serverless function handler
-    Converts Vercel event to ASGI and back
+    Wraps async Mangum adapter for synchronous Vercel environment
     """
     try:
-        # Convert Vercel event to ASGI scope
-        # Mangum handles the conversion internally
-        response = await adapter(event, context)
-        return response
+        # Run async adapter in event loop
+        # Vercel may not support async handlers directly
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            response = loop.run_until_complete(adapter(event, context))
+            return response
+        finally:
+            loop.close()
     except Exception as e:
         print(f"Error in handler: {e}")
         import traceback
@@ -34,5 +39,5 @@ async def handler(event, context=None):
         return {
             "statusCode": 500,
             "headers": {"Content-Type": "application/json"},
-            "body": json.dumps({"error": str(e)})
+            "body": '{"error": "' + str(e).replace('"', '\\"') + '"}'
         }
