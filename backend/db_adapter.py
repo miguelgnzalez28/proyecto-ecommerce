@@ -8,6 +8,12 @@ import httpx
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 
+
+def _normalize_blob_url(base_url: str) -> str:
+    """Normalize Vercel Blob URL removing trailing slash."""
+    normalized = (base_url or '').strip().rstrip('/')
+    return normalized or 'https://blob.vercel-storage.com'
+
 # Only import ObjectId if pymongo is available (for MongoDB wrapper)
 try:
     from bson import ObjectId
@@ -25,7 +31,7 @@ class VercelBlobDB:
     def __init__(self):
         # Read token from environment variable
         self.token = os.environ.get('BLOB_READ_WRITE_TOKEN', '')
-        self.base_url = "https://blob.vercel-storage.com"
+        self.base_url = _normalize_blob_url(os.environ.get('BLOB_API_URL', 'https://blob.vercel-storage.com'))
         self.cache = {}  # In-memory cache for current request
         
         if not self.token:
@@ -62,6 +68,7 @@ class VercelBlobDB:
                     f"{self.base_url}",
                     headers={
                         "Authorization": f"Bearer {self.token}",
+                        "x-api-version": "4",
                     },
                     params={"prefix": filename}
                 )
@@ -69,8 +76,9 @@ class VercelBlobDB:
                 if list_response.status_code == 200:
                     data = list_response.json()
                     blobs = data.get('blobs', [])
-                    
+
                     if blobs:
+                        blobs.sort(key=lambda b: b.get('uploadedAt', ''), reverse=True)
                         # Get the blob content using the url from the list
                         blob_url = blobs[0].get('url')
                         if blob_url:
@@ -105,37 +113,44 @@ class VercelBlobDB:
             json_data = json.dumps(data, ensure_ascii=False, default=str)
             
             async with httpx.AsyncClient(timeout=30.0) as client:
-                # Vercel Blob Storage API REST format
-                # Based on: put('pathname', 'content', { access: 'public' })
-                # The API expects multipart/form-data with:
-                #   - pathname: the file path (string)
-                #   - file: the file content (as string or bytes)
-                #   - access: 'public' or 'private' (string)
-                
-                # Create multipart form data
-                # httpx will automatically set Content-Type to multipart/form-data with boundary
-                # Format: (filename, content, content_type)
-                files = {
-                    'file': (filename, json_data.encode('utf-8'), 'application/json')
-                }
-                form_data = {
-                    'pathname': filename,
-                    'access': 'public'
-                }
                 
                 print(f"Attempting to save blob: {filename}")
                 print(f"Token present: {bool(self.token)}")
                 print(f"Token prefix: {self.token[:20] if self.token else 'N/A'}...")
                 print(f"Data size: {len(json_data)} bytes")
                 
-                response = await client.post(
-                    f"{self.base_url}",
+                # Preferred Vercel Blob REST upload endpoint.
+                # Force deterministic file names to avoid random-suffix versions.
+                response = await client.put(
+                    f"{self.base_url}/{filename}",
                     headers={
                         "Authorization": f"Bearer {self.token}",
+                        "x-api-version": "4",
+                        "x-content-type": "application/json; charset=utf-8",
+                        "x-add-random-suffix": "0",
+                        "x-allow-overwrite": "1",
                     },
-                    files=files,
-                    data=form_data
+                    content=json_data.encode('utf-8')
                 )
+
+                # Backwards compatible fallback for older endpoint format
+                if response.status_code not in [200, 201] and response.status_code != 409:
+                    files = {
+                        'file': (filename, json_data.encode('utf-8'), 'application/json')
+                    }
+                    form_data = {
+                        'pathname': filename,
+                        'access': 'public'
+                    }
+                    response = await client.post(
+                        f"{self.base_url}",
+                        headers={
+                            "Authorization": f"Bearer {self.token}",
+                            "x-api-version": "4",
+                        },
+                        files=files,
+                        data=form_data
+                    )
                 
                 print(f"Response status: {response.status_code}")
                 print(f"Response headers: {dict(response.headers)}")
@@ -237,8 +252,10 @@ class VercelBlobDB:
             inserted_ids.append(doc_id)
             data.append(doc)
         
-        await self._save_blob(collection, data)
-        
+        success = await self._save_blob(collection, data)
+        if not success:
+            raise Exception(f"Failed to save documents to blob storage for collection: {collection}")
+
         return {'inserted_ids': inserted_ids}
     
     async def update_one(self, collection: str, query: Dict, update: Dict, upsert: bool = False) -> Dict:
@@ -269,8 +286,10 @@ class VercelBlobDB:
             await self.insert_one(collection, new_doc)
             return {'matched_count': 0, 'modified_count': 0, 'upserted_id': new_doc.get('id')}
         
-        await self._save_blob(collection, data)
-        
+        success = await self._save_blob(collection, data)
+        if not success:
+            raise Exception(f"Failed to update document in blob storage for collection: {collection}")
+
         return {'matched_count': matched_count, 'modified_count': modified_count}
     
     async def delete_one(self, collection: str, query: Dict) -> Dict:
@@ -285,8 +304,10 @@ class VercelBlobDB:
                 deleted_count = 1
                 break
         
-        await self._save_blob(collection, data)
-        
+        success = await self._save_blob(collection, data)
+        if not success:
+            raise Exception(f"Failed to delete document in blob storage for collection: {collection}")
+
         return {'deleted_count': deleted_count}
     
     async def delete_many(self, collection: str, query: Dict) -> Dict:
@@ -297,8 +318,10 @@ class VercelBlobDB:
         data = [doc for doc in data if not all(doc.get(k) == v for k, v in query.items())]
         deleted_count = original_len - len(data)
         
-        await self._save_blob(collection, data)
-        
+        success = await self._save_blob(collection, data)
+        if not success:
+            raise Exception(f"Failed to delete documents in blob storage for collection: {collection}")
+
         return {'deleted_count': deleted_count}
     
     async def count_documents(self, collection: str, query: Dict = None) -> int:
