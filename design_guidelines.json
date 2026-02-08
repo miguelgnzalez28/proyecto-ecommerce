@@ -1,0 +1,144 @@
+{
+  "identity": {
+    "name": "E1",
+    "archetype": "The Performance Pro",
+    "mission": "Create a high-octane, precision-engineered automotive e-commerce experience.",
+    "vibe": "Mechanical, Aggressive, Trustworthy, Fast."
+  },
+  "typography": {
+    "headings": {
+      "family": "Teko, sans-serif",
+      "weights": ["600", "700"],
+      "usage": "All section titles, hero text, product names.",
+      "letterSpacing": "tracking-tight"
+    },
+    "body": {
+      "family": "Manrope, sans-serif",
+      "weights": ["400", "500"],
+      "usage": "Descriptions, prices, UI elements.",
+      "letterSpacing": "tracking-normal"
+    },
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&family=Teko:wght@600;700&display=swap"
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#DC2626",
+        "foreground": "#FFFFFF",
+        "hover": "#B91C1C"
+      },
+      "background": "#09090B",
+      "foreground": "#FAFAFA",
+      "card": {
+        "DEFAULT": "#18181B",
+        "foreground": "#FAFAFA"
+      },
+      "popover": {
+        "DEFAULT": "#18181B",
+        "foreground": "#FAFAFA"
+      },
+      "muted": {
+        "DEFAULT": "#27272A",
+        "foreground": "#A1A1AA"
+      },
+      "accent": {
+        "DEFAULT": "#27272A",
+        "foreground": "#FAFAFA"
+      },
+      "border": "#27272A",
+      "input": "#27272A",
+      "ring": "#DC2626"
+    },
+    "rules": [
+      "Use Primary Red (#DC2626) ONLY for CTAs, active states, and critical alerts.",
+      "Backgrounds must be deep Zinc-950 (#09090B), never pure black.",
+      "Cards must be Zinc-900 (#18181B) with a subtle 1px border of Zinc-800 (#27272A).",
+      "Text must be Zinc-50 (#FAFAFA) for headings and Zinc-400 (#A1A1AA) for secondary text."
+    ]
+  },
+  "visual_enhancers": {
+    "radius": "rounded-none",
+    "shadows": "shadow-none",
+    "borders": "border-l-2 border-red-600 (for active items)",
+    "textures": "Use a subtle carbon fiber pattern or noise overlay on the main background if possible.",
+    "gradients": "Avoid gradients. Use solid, flat colors for a 'mechanical' feel."
+  },
+  "layout_strategy": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing": "Generous. Use py-24 for sections. gap-8 for grids.",
+    "grid_system": "Bento Grid for categories. Tetris Grid for Hero.",
+    "mobile": "Stack everything. 100% width on mobile."
+  },
+  "components": {
+    "buttons": {
+      "style": "Sharp edges (rounded-none). Uppercase text. Tracking-widest.",
+      "variants": {
+        "default": "bg-red-600 hover:bg-red-700 text-white font-bold uppercase tracking-wider",
+        "outline": "border-2 border-zinc-700 hover:border-white text-white uppercase tracking-wider bg-transparent"
+      }
+    },
+    "cards": {
+      "style": "Flat, dark grey (Zinc-900). No shadow. 1px border (Zinc-800).",
+      "hover": "border-red-600 transition-colors duration-300"
+    },
+    "inputs": {
+      "style": "bg-zinc-900 border-zinc-800 focus:border-red-600 rounded-none h-12"
+    }
+  },
+  "image_urls": {
+    "hero": {
+      "url": "https://images.unsplash.com/photo-1624893101114-c0a7c3bfe3de",
+      "alt": "High performance engine close up",
+      "category": "hero"
+    },
+    "categories": [
+      {
+        "name": "Brakes",
+        "url": "https://images.unsplash.com/photo-1733309730239-1d2b723eb807",
+        "alt": "Brake Caliper"
+      },
+      {
+        "name": "Suspension",
+        "url": "https://images.unsplash.com/photo-1581719795311-a65c33239f8a",
+        "alt": "Suspension Shock"
+      },
+      {
+        "name": "Engine Parts",
+        "url": "https://images.unsplash.com/photo-1764537432322-dad234b0848d",
+        "alt": "Engine Air Filter"
+      },
+      {
+        "name": "Service",
+        "url": "https://images.unsplash.com/photo-1708745427274-d5de5122fd57",
+        "alt": "Mechanic working"
+      }
+    ],
+    "placeholders": {
+      "product": "https://images.unsplash.com/photo-1689204778500-329b194714f8",
+      "avatar": "https://images.unsplash.com/photo-1644077760673-2b64a1dde738"
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. THEME SETUP: Update tailwind.config.js to use the 'Manrope' and 'Teko' fonts. Set the color palette to the Zinc/Red scheme defined above.",
+    "2. COMPONENT OVERRIDES: Go to src/components/ui and update Button, Card, and Input to match the 'Sharp/Mechanical' aesthetic (rounded-none, uppercase).",
+    "3. HERO SECTION: Build a high-impact hero using the Mercedes engine image. Overlay big, bold Teko text: 'PRECISION PARTS. MAXIMUM PERFORMANCE.'",
+    "4. CATALOG: Use a dark card design. Product images should have a subtle dark overlay that vanishes on hover.",
+    "5. ADMIN PANEL: Keep it clean but dark. Use high contrast for data tables.",
+    "6. FORMS: All inputs must be square (rounded-none) and have a focus ring of Red-600.",
+    "7. NAVIGATION: Sticky header with a blur effect (backdrop-blur-md) but keep it dark (bg-black/80).",
+    "8. DATA-TESTID: Ensure every interactive element has a data-testid attribute."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts. Use asymmetry.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for overlays.",
+    "You MUST NOT apply universal transition. Eg: transition: all.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles (sharp, uppercase for this brand).",
+    "NEVER use AI assistant Emoji characters.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable.",
+    "Use sonner for toasts."
+  ]
+}
