@@ -11,11 +11,11 @@ sys.path.insert(0, backend_path)
 from server import app
 from mangum import Mangum
 
-# Wrap FastAPI app with Mangum for AWS Lambda/Vercel compatibility
-# Mangum converts ASGI to AWS Lambda/Vercel format
-mangum_handler = Mangum(app, lifespan="off")
+# Create Mangum adapter
+adapter = Mangum(app, lifespan="off")
 
-# Vercel expects a function handler, not an instance
-def handler(event, context):
+# Vercel Python functions expect the handler to be callable
+# Export the adapter's __call__ method as the handler
+def handler(request):
     """Vercel serverless function handler"""
-    return mangum_handler(event, context)
+    return adapter(request)
